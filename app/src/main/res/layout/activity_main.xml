@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:animateLayoutChanges="true">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Pusher state:"
+                android:textStyle="bold"
+                android:gravity="center"/>
+
+            <TextView
+                android:id="@+id/pusherStateTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:text="@string/hello_blank_fragment"
+                android:gravity="center"/>
+
+            <TextView
+                android:id="@+id/myChannelTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:text="@string/hello_blank_fragment"
+                android:gravity="center"/>
+
+            <LinearLayout
+                android:id="@+id/content"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible"
+                android:animateLayoutChanges="true">
+
+                <android.support.design.widget.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp">
+
+                    <android.support.design.widget.TextInputEditText
+                        android:id="@+id/myNameEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="user10"
+                        android:hint="My name">
+
+                    </android.support.design.widget.TextInputEditText>
+
+                </android.support.design.widget.TextInputLayout>
+
+                <Button
+                    android:id="@+id/myChannelBtn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Create channel"
+                    android:backgroundTint="@color/colorAccent"
+                    android:textColor="@android:color/white"/>
+
+                <LinearLayout
+                    android:id="@+id/call_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <android.support.design.widget.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp">
+
+                        <android.support.design.widget.TextInputEditText
+                            android:id="@+id/opponentEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="user20"
+                            android:hint="Opponent name">
+
+                        </android.support.design.widget.TextInputEditText>
+
+                    </android.support.design.widget.TextInputLayout>
+
+
+                    <Button
+                        android:id="@+id/callVideoBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Video Call"
+                        android:layout_marginTop="16dp"
+                        android:backgroundTint="@color/colorAccent"
+                        android:textColor="@android:color/white"/>
+
+                    <Button
+                        android:id="@+id/callVoiceBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Voice Call"
+                        android:backgroundTint="@color/colorGreen"
+                        android:textColor="@android:color/white"/>
+
+                    <Button
+                        android:id="@+id/callGroupBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Group Call"
+                        android:backgroundTint="@color/colorBlue"
+                        android:textColor="@android:color/white"/>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight=".4"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+    </HorizontalScrollView>
+
+
+</LinearLayout>

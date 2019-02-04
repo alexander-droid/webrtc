@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">WebRTCClient</string>
+
+    <string name="channel_name_call" translatable="false">Call</string>
+    <string name="channel_description_call" translatable="false">Call notifications</string>
+    <string name="channel_name_incoming_call" translatable="false">Incoming Call</string>
+    <string name="channel_description_incoming_call" translatable="false">Call notifications</string>
+
+</resources>

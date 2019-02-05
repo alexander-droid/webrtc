@@ -8,7 +8,7 @@ data class MessageIceCandidate(
     data class Data(
         val from: String,
         val to: String,
-        val candidate: Candidate
+        val candidate: Candidate?
     ) {
         data class Candidate(
             val candidate: String,

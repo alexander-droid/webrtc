@@ -5,12 +5,7 @@ import org.webrtc.*
 
 abstract class CustomPeerConnectionObserver(logTag: String) : PeerConnection.Observer {
 
-    private var logTag: String? = null
-
-    init {
-        this.logTag = this.javaClass.canonicalName
-        this.logTag = this.logTag + " " + logTag
-    }
+    private var logTag: String? = "CustomPeerConnectionObserver"
 
     override fun onSignalingChange(signalingState: PeerConnection.SignalingState) {
         Log.d(logTag, "onSignalingChange() called with: signalingState = [$signalingState]")

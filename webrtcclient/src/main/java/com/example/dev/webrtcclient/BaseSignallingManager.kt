@@ -36,6 +36,8 @@ abstract class BaseSignallingManager {
 
     protected lateinit var pusher: Pusher
 
+    protected val delayedEmitList = mutableListOf<Runnable>()
+
     fun connect(callInfo: CallInfo, success: (() -> Unit)? = null) {
         Log.d(TAG, "connect")
         this.callInfo = callInfo
@@ -68,6 +70,8 @@ abstract class BaseSignallingManager {
                             success?.invoke()
                         }
                         isFirstConnect = false
+
+
                     }
                 }
             }

@@ -30,9 +30,9 @@ class DirectCallActivity : AppCompatActivity() {
         }
 
 
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        audioManager.mode = AudioManager.MODE_IN_CALL
-        audioManager.isSpeakerphoneOn = true
+//        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+//        audioManager.mode = AudioManager.MODE_IN_CALL
+//        audioManager.isSpeakerphoneOn = true
 
         Log.i(TAG, "onCreate ${intent?.extras?.getString(DirectCallService.EXTRA_CALL_TYPE, null)}")
         if (savedInstanceState == null) {
@@ -48,6 +48,7 @@ class DirectCallActivity : AppCompatActivity() {
             }
         }
     }
+
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)

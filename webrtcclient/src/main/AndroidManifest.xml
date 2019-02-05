@@ -3,8 +3,14 @@
     package="com.example.dev.webrtcclient">
 
     <application>
-        <activity android:name=".call.direct.ui.DirectCallActivity"
-            android:theme="@style/CallTheme"/>
+        <service
+            android:name=".call.ptt.PTTCallService"
+            android:enabled="true"
+            android:exported="false"></service>
+
+        <activity
+            android:name=".call.direct.ui.DirectCallActivity"
+            android:theme="@style/CallTheme" />
 
         <service
             android:name=".call.direct.DirectCallService"

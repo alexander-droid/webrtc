@@ -72,10 +72,7 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
     private val binder = CallBinder()
 
-    private lateinit var myName: String
-    private lateinit var opponentName: String
-    private lateinit var presenceChannelName: String
-    private lateinit var callType: String
+    private lateinit var callInfo: CallInfo
 
     val rootEglBaseObserver: Observable<EglBase>
         get() = webRTCManager.rootEglBaseObserver
@@ -121,24 +118,10 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
         when(intent?.action) {
             ACTION_PERFORM_CALL -> {
-                webRTCManager.doCall(CallInfo(
-                    callType = callType,
-                    myId = myName,
-                    myName = myName,
-                    opponentId = opponentName,
-                    opponentName = opponentName,
-                    channelName = presenceChannelName
-                ))
+                webRTCManager.doCall(callInfo)
             }
             ACTION_RECEIVE_CALL -> {
-                webRTCManager.callReceived(CallInfo(
-                    callType = callType,
-                    myId = myName,
-                    myName = myName,
-                    opponentId = opponentName,
-                    opponentName = opponentName,
-                    channelName = presenceChannelName
-                ))
+                webRTCManager.callReceived(callInfo)
             }
             ACTION_ANSWER_CALL -> {
                 sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
@@ -154,7 +137,7 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     }
 
     private fun startCallActivity() {
-        when(callType) {
+        when(callInfo.callType) {
             CALL_TYPE_VIDEO -> {
                 DirectCallActivity.startVideo(this)
             }
@@ -168,10 +151,19 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
     private fun retrieveExtras(intent: Intent?) {
         intent?:return
-        presenceChannelName = intent.getStringExtra(EXTRA_PRESENCE_CHANNEL_NAME)
-        callType = intent.getStringExtra(EXTRA_CALL_TYPE)
-        myName = intent.getStringExtra(EXTRA_MY_NAME)
-        opponentName = intent.getStringExtra(EXTRA_OPPONENT_NAME)
+        val presenceChannelName = intent.getStringExtra(EXTRA_PRESENCE_CHANNEL_NAME)
+        val callType = intent.getStringExtra(EXTRA_CALL_TYPE)
+        val myName = intent.getStringExtra(EXTRA_MY_NAME)
+        val opponentName = intent.getStringExtra(EXTRA_OPPONENT_NAME)
+
+        callInfo = CallInfo(
+            callType = callType,
+            myId = myName,
+            myName = myName,
+            opponentId = opponentName,
+            opponentName = opponentName,
+            channelName = presenceChannelName
+        )
 
         Log.d(TAG,"EXTRA_CALL_TYPE $callType")
         Log.d(TAG,"EXTRA_MY_NAME $myName")
@@ -198,22 +190,22 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     private fun applyState(callState: CallState) {
         when(callState) {
             CallState.INITIALIZING_CALLING_OUT -> {
-                val notification = callNotificationHelper.getOutComingCallNotification(callType, opponentName)
+                val notification = callNotificationHelper.getOutComingCallNotification(callInfo.callType, callInfo.opponentName)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             CallState.CALLING_IN -> {
-                val notification = callNotificationHelper.getInComingCallNotification(callType, opponentName)
+                val notification = callNotificationHelper.getInComingCallNotification(callInfo.callType, callInfo.opponentName)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 wakeUp()
             }
             CallState.AWAITING_OFFER -> {
-                val notification = callNotificationHelper.getRunningCallNotification(callType, opponentName)
+                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.opponentName)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             CallState.CALL_RUNNING -> {
-                val notification = callNotificationHelper.getRunningCallNotification(callType, opponentName)
+                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.opponentName)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
             }
         }

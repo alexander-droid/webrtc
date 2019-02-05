@@ -201,7 +201,15 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
     @WorkerThread
     fun emitCallDecline() {
-        Log.d(TAG,"emitCallDecline")
+        Log.d(TAG,"emitCallDecline ${RequestDecline(
+            event = EVENT_CALL_DECLINE,
+            to = listOf("private-${callInfo.opponentId}"),
+            data = RequestDecline.Data(
+                channel = callInfo.channelName,
+                time = System.currentTimeMillis(),
+                busy = false
+            )
+        )}")
         pusherApiManager.requestDecline(RequestDecline(
             event = EVENT_CALL_DECLINE,
             to = listOf("private-${callInfo.opponentId}"),
@@ -310,24 +318,17 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
     companion object {
         private const val TAG = "DirectSignallingManager"
     }
-}
 
+    interface Callback {
+        fun onDecline(decline: MessageDecline? = null)
 
+        fun onOffer(offer: MessageOffer)
+        fun onAnswer(answer: MessageAnswer)
+        fun onIce(ice: MessageIceCandidate)
 
+        fun onGenerateOffer()
+        fun onError(message: String?, exception: Exception? = null)
+        fun onOpponentUnsubscribed(userInfo: CallUserInfo)
+    }
 
-
-
-
-
-
-interface Callback {
-    fun onDecline(decline: MessageDecline? = null)
-
-    fun onOffer(offer: MessageOffer)
-    fun onAnswer(answer: MessageAnswer)
-    fun onIce(ice: MessageIceCandidate)
-
-    fun onGenerateOffer()
-    fun onError(message: String?, exception: Exception? = null)
-    fun onOpponentUnsubscribed(userInfo: CallUserInfo)
 }

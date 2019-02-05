@@ -7,6 +7,7 @@ import android.os.Looper
 import android.support.annotation.WorkerThread
 import android.util.Base64
 import android.util.Log
+import com.example.dev.webrtcclient.BaseWebRTCManager
 import com.example.dev.webrtcclient.CustomPeerConnectionObserver
 import com.example.dev.webrtcclient.CustomSdpObserver
 import com.example.dev.webrtcclient.api.XirsysApi
@@ -27,11 +28,15 @@ import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
 import okhttp3.OkHttpClient
 import org.webrtc.*
+import org.webrtc.voiceengine.WebRtcAudioUtils
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
 
-class DirectWebRTCManager(private val context: Context, private val callback: Callback) : Callback {
+class DirectWebRTCManager(
+    private val context: Context,
+    private val callback: Callback
+) : BaseWebRTCManager(), DirectSignallingManager.Callback {
 
     private val timeout = 60000L
     private val timeoutHandler = Handler()
@@ -66,11 +71,9 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
     private var disposable = CompositeDisposable()
 
 
-
     private val peerIceServers = mutableListOf<PeerConnection.IceServer>()
     private lateinit var rootEglBase: EglBase
     private lateinit var peerConnectionFactory: PeerConnectionFactory
-    private lateinit var sdpConstraints: MediaConstraints
     private lateinit var localPeer: PeerConnection
 
     private lateinit var audioSource: AudioSource
@@ -86,15 +89,8 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
     private var withVideo = false
     private lateinit var callInfo: CallInfo
 
-    private val xirsysApiManager = Retrofit.Builder()
-            .baseUrl("https://global.xirsys.net")
-            .addConverterFactory(GsonConverterFactory.create(Gson()))
-            .client(OkHttpClient.Builder().build())
-            .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-            .build()
-            .create(XirsysApi::class.java)
-
     init {
+
         handlerThread.start()
         workerHandler = Handler(handlerThread.looper)
     }
@@ -197,13 +193,6 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
         }
     }
 
-    @WorkerThread
-    private fun requestIceServers(): TurnServer? {
-        val data = "cilicondev:f903b92a-154c-11e9-80fd-0242ac110003".toByteArray(charset("UTF-8"))
-        val auth = "Basic " + Base64.encodeToString(data, Base64.NO_WRAP)
-        return xirsysApiManager.getIceCandidates(auth).execute().body()
-    }
-
     private fun setIceServers(turnServer: TurnServer) {
         addEvent(SimpleEvent.InMessage("Set ice servers"))
         turnServer.iceServerList?.iceServers?.forEach { iceServer ->
@@ -250,7 +239,7 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
 
     private fun createOffer() {
         addEvent(SimpleEvent.InternalMessage("create offer"))
-        sdpConstraints = MediaConstraints()
+        val sdpConstraints = MediaConstraints()
         sdpConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         if (withVideo) {
             sdpConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
@@ -312,7 +301,9 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
 
 
     private fun addIceCandidate(ice: MessageIceCandidate) {
-        localPeer.addIceCandidate(IceCandidate(ice.data.candidate.sdpMid, ice.data.candidate.sdpMLineIndex, ice.data.candidate.candidate))
+        ice.data.candidate?.also { candidate ->
+            localPeer.addIceCandidate(IceCandidate(candidate.sdpMid, ice.data.candidate.sdpMLineIndex, candidate.candidate))
+        }
     }
 
     private fun setOffer(offer: MessageOffer) {
@@ -514,6 +505,7 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
     }
 
     override fun onError(message: String?, exception: Exception?) {
+        Log.d(TAG, message, exception)
         addEvent(SimpleEvent.ErrorMessage(message))
         mainHandler.post {
             callback.onFinishCall(message)
@@ -572,6 +564,12 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
 
 
     fun release() {
+        logSubject.onComplete()
+        callStateSubject.onComplete()
+        localVideoTrackSubject.onComplete()
+        remoteVideoTrackSubject.onComplete()
+        rootEglSubject.onComplete()
+
         disposable.dispose()
         signalingManager.disconnect()
         localPeer.dispose()
@@ -597,6 +595,8 @@ class DirectWebRTCManager(private val context: Context, private val callback: Ca
 
 
     companion object {
+        const val TAG = "DirectWebRTCManager"
+
         const val CALL_TYPE_VIDEO = "video"
         const val CALL_TYPE_VOICE = "voice"
     }

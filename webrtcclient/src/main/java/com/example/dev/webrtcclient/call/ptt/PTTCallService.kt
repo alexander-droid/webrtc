@@ -6,16 +6,15 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
+import android.widget.Toast
+import com.example.dev.webrtcclient.model.GroupCallInfo
 import io.reactivex.disposables.CompositeDisposable
 
 class PTTCallService : Service(), PTTWebRTCManager.Callback {
-    override fun onLeave(message: String?) {
 
-    }
+    private var callInfo: GroupCallInfo? = null
 
     private lateinit var webRTCManager: PTTWebRTCManager
-
-    private var isFirstLaunch = true
 
     private val disposable = CompositeDisposable()
 
@@ -33,17 +32,13 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.e(TAG,"onStartCommand ${intent?.action}")
 
-        if (isFirstLaunch) {
-            retrieveExtras(intent)
-            isFirstLaunch = false
-        }
-
         when(intent?.action) {
             ACTION_JOIN_GROUP -> {
+                retrieveExtras(intent)
 //                PTTCallActivity.start(this)
             }
             ACTION_LEAVE -> {
-                stopSelf()
+                onLeave("You left the group")
             }
         }
         return START_NOT_STICKY
@@ -55,19 +50,17 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
         val callType = intent.getStringExtra(EXTRA_CALL_TYPE)
         val myName = intent.getStringExtra(EXTRA_MY_NAME)
 
-//        callInfo = CallInfo(
-//            callType = callType,
-//            myId = myName,
-//            myName = myName,
-//            opponentId = opponentName,
-//            opponentName = opponentName,
-//            channelName = presenceChannelName
-//        )
-//
-//        Log.d(TAG,"EXTRA_CALL_TYPE $callType")
-//        Log.d(TAG,"EXTRA_MY_NAME $myName")
-//        Log.d(TAG,"EXTRA_GROUP_CHANNEL_NAME $channelName")
-//
+        callInfo = GroupCallInfo(
+            callType = callType,
+            myId = myName,
+            myName = myName,
+            channelName = channelName
+        )
+
+        Log.d(TAG,"EXTRA_CALL_TYPE $callType")
+        Log.d(TAG,"EXTRA_MY_NAME $myName")
+        Log.d(TAG,"EXTRA_GROUP_CHANNEL_NAME $channelName")
+
 //        userInfoSubject.onNext(CallUserInfo(
 //            id = opponentName,
 //            data = CallUserInfo.Data(
@@ -76,6 +69,34 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
 //        ))
     }
 
+
+
+
+
+
+    //User interaction
+    fun leave() {
+        startService(getLeaveIntent(this))
+    }
+
+    fun startTalking() {
+        webRTCManager.startTalking(callInfo)
+    }
+
+    fun stopTalking() {
+        webRTCManager.stopTalking()
+    }
+
+
+
+
+    //WebRTC callbacks
+    override fun onLeave(message: String?) {
+        message?.also {
+            Toast.makeText(this, it, Toast.LENGTH_LONG).show()
+        }
+        stopSelf()
+    }
 
 
 

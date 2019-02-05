@@ -7,7 +7,6 @@ import com.example.dev.webrtcclient.model.response.TurnServer
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import org.webrtc.voiceengine.WebRtcAudioManager
-import org.webrtc.voiceengine.WebRtcAudioTrack
 import org.webrtc.voiceengine.WebRtcAudioUtils
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
@@ -25,8 +24,8 @@ abstract class BaseWebRTCManager {
 
     init {
         WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true)
-//        WebRtcAudioManager.setStereoInput(true)
-//        WebRtcAudioManager.setStereoOutput(true)
+        WebRtcAudioManager.setStereoInput(true)
+        WebRtcAudioManager.setStereoOutput(true)
     }
 
     @WorkerThread

@@ -57,7 +57,7 @@
                         android:id="@+id/myNameEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="user10"
+                        android:text="bob10"
                         android:hint="My name">
 
                     </android.support.design.widget.TextInputEditText>
@@ -89,7 +89,7 @@
                             android:id="@+id/opponentEditText"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="user20"
+                            android:text="bob20"
                             android:hint="Opponent name">
 
                         </android.support.design.widget.TextInputEditText>

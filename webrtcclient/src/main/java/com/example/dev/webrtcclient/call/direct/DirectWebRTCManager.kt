@@ -505,7 +505,7 @@ class DirectWebRTCManager(
     }
 
     override fun onError(message: String?, exception: Exception?) {
-        Log.d(TAG, message, exception)
+        Log.e(TAG, message, exception)
         addEvent(SimpleEvent.ErrorMessage(message))
         mainHandler.post {
             callback.onFinishCall(message)

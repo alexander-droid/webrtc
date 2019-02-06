@@ -158,10 +158,14 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
         callInfo = CallInfo(
             callType = callType,
-            myId = myName,
-            myName = myName,
-            opponentId = opponentName,
-            opponentName = opponentName,
+            me = CallUserInfo(
+                id = myName,
+                name = myName
+            ),
+            recipient = CallUserInfo(
+                id = opponentName,
+                name = opponentName
+            ),
             channelName = presenceChannelName
         )
 
@@ -169,12 +173,7 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
         Log.d(TAG,"EXTRA_MY_NAME $myName")
         Log.d(TAG,"EXTRA_OPPONENT_NAME $opponentName")
 
-        userInfoSubject.onNext(CallUserInfo(
-                id = opponentName,
-                data = CallUserInfo.Data(
-                        name = opponentName
-                )
-        ))
+        userInfoSubject.onNext(callInfo.recipient)
     }
 
 
@@ -190,22 +189,22 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     private fun applyState(callState: CallState) {
         when(callState) {
             CallState.INITIALIZING_CALLING_OUT -> {
-                val notification = callNotificationHelper.getOutComingCallNotification(callInfo.callType, callInfo.opponentName)
+                val notification = callNotificationHelper.getOutComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             CallState.CALLING_IN -> {
-                val notification = callNotificationHelper.getInComingCallNotification(callInfo.callType, callInfo.opponentName)
+                val notification = callNotificationHelper.getInComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 wakeUp()
             }
             CallState.AWAITING_OFFER -> {
-                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.opponentName)
+                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             CallState.CALL_RUNNING -> {
-                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.opponentName)
+                val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
             }
         }

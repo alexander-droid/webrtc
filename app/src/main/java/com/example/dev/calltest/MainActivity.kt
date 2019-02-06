@@ -10,6 +10,7 @@ import android.view.View
 import com.example.dev.webrtcclient.EVENT_CALL
 import com.example.dev.webrtcclient.call.direct.DirectCallService
 import com.example.dev.webrtcclient.call.direct.DirectWebRTCManager
+import com.example.dev.webrtcclient.call.ptt.PTTCallService
 import com.example.dev.webrtcclient.log.LogAdapter
 import com.example.dev.webrtcclient.model.request.RequestCall
 import com.google.gson.Gson
@@ -83,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         callGroupBtn.setOnClickListener {
-//            PTTCallService.startGroup(this, myNameEditText.text.toString(), opponentEditText.text.toString())
+            PTTCallService.startGroup(this, myNameEditText.text.toString(), opponentEditText.text.toString())
         }
 
         myChannelBtn.setOnClickListener {

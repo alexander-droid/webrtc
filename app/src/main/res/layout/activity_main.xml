@@ -89,8 +89,8 @@
                             android:id="@+id/opponentEditText"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="bob20"
-                            android:hint="Opponent name">
+                            android:text="bob"
+                            android:hint="Recipient name or Group name">
 
                         </android.support.design.widget.TextInputEditText>
 
@@ -118,7 +118,7 @@
                         android:id="@+id/callGroupBtn"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Group Call"
+                        android:text="Join Group"
                         android:backgroundTint="@color/colorBlue"
                         android:textColor="@android:color/white"/>
 

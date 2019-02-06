@@ -54,7 +54,7 @@ class DirectAudioFragment : Fragment() {
                 service.userInfoObservable
                     .subscribe { userInfo ->
                         userInfoContainer.visibility = View.VISIBLE
-                        opponentNameTextView.text = userInfo.data.name
+                        opponentNameTextView.text = userInfo.name
                     }
             )
 

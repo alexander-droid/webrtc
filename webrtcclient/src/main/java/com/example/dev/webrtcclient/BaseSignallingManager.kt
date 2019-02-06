@@ -3,14 +3,17 @@ package com.example.dev.webrtcclient
 import android.support.annotation.CallSuper
 import android.util.Log
 import com.example.dev.webrtcclient.model.CallInfo
+import com.example.dev.webrtcclient.model.CallUserInfo
 import com.pusher.client.Pusher
 import com.pusher.client.PusherOptions
+import com.pusher.client.channel.User
 import com.pusher.client.connection.ConnectionEventListener
 import com.pusher.client.connection.ConnectionState
 import com.pusher.client.connection.ConnectionStateChange
 import com.pusher.client.util.HttpAuthorizer
 import com.pusher.client.util.UrlEncodedConnectionFactory
 import io.reactivex.disposables.CompositeDisposable
+import org.json.JSONObject
 
 const val SIGNAL_ICE = "ICE_CANDIDATE"
 const val SIGNAL_OFFER = "OFFER"
@@ -25,12 +28,11 @@ const val EVENT_RTC_MEMBER_ADDED = "pusher:member_added"
 const val EVENT_RTC_SUBSCRIBED = "pusher:subscription_succeeded"
 const val EVENT_RTC_MEMBER_REMOVED = "pusher:member_removed"
 const val EVENT_SERVER_RTC = "server-rtc"
+const val EVENT_GROUP_TALK = "client-group-talk"
 
 abstract class BaseSignallingManager {
 
     private val disposable = CompositeDisposable()
-
-    protected lateinit var callInfo: CallInfo
 
     protected var isFirstConnect = true
 
@@ -38,11 +40,10 @@ abstract class BaseSignallingManager {
 
     protected val delayedEmitList = mutableListOf<Runnable>()
 
-    fun connect(callInfo: CallInfo, success: (() -> Unit)? = null) {
+    fun connect(userId: String, success: (() -> Unit)? = null) {
         Log.d(TAG, "connect")
-        this.callInfo = callInfo
         val connectionFactory = UrlEncodedConnectionFactory(mutableMapOf<String, String>().apply {
-            put("userId", callInfo.myId)
+            put("userId", userId)
         })
 
         pusher = Pusher(ApiConfig.pusherApiKey(), PusherOptions().apply {
@@ -88,6 +89,19 @@ abstract class BaseSignallingManager {
         Log.d(TAG, "disconnect")
         pusher.disconnect()
         disposable.dispose()
+    }
+
+    protected fun map(user: User): CallUserInfo? {
+        val jsonInfo = JSONObject(user.info)
+        if (jsonInfo.has("name")) {
+            val recipientId = jsonInfo.getString("name")
+            return CallUserInfo(
+                id = recipientId,
+                name = recipientId
+            )
+        }
+
+        return null
     }
 
     companion object {

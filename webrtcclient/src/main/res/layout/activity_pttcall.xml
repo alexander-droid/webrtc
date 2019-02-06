@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/loadingView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="Connecting..."
+        android:gravity="center"
+        android:textColor="@color/blue"
+        android:visibility="gone"
+        android:textAppearance="@style/Base.TextAppearance.AppCompat.Headline"/>
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:id="@+id/userInfoContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="#28333333"
+            android:orientation="vertical"
+            android:paddingLeft="10dp"
+            android:paddingTop="10dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="10dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:visibility="gone"
+            android:animateLayoutChanges="true"
+            android:gravity="center">
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/talkingTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/colorAccent"
+            android:layout_margin="8dp"
+            android:text="Text"
+            android:textAppearance="@style/Base.TextAppearance.AppCompat.Large"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/userInfoContainer"
+            tools:visibility="visible" />
+
+        <ToggleButton
+            android:id="@+id/audioToggle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintWidth_percent="0.5"
+            app:layout_constraintDimensionRatio="1"
+            android:textOn="Stop"
+            android:textOff="Speak"
+            android:textSize="30sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <Button
+            android:id="@+id/button_leave"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Leave"
+            android:backgroundTint="@color/red"
+            android:textColor="@android:color/white"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_margin="16dp"/>
+
+    </android.support.constraint.ConstraintLayout>
+
+</FrameLayout>

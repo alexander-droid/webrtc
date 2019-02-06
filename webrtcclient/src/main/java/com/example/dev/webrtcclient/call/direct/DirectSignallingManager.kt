@@ -80,12 +80,9 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
         override fun userUnsubscribed(channelName: String, user: User) {
             Log.w(TAG,"presenceSubscription userUnsubscribed: $channelName, $user")
-            val userData = Gson().fromJson(user.info, CallUserInfo.Data::class.java)
-            val userInfo = CallUserInfo(
-                id = user.id,
-                data = userData
-            )
-            callback.onOpponentUnsubscribed(userInfo)
+            map(user)?.also { recipientInfo ->
+                callback.onOpponentUnsubscribed(recipientInfo)
+            }
         }
 
         override fun userSubscribed(channelName: String?, user: User?) {
@@ -146,12 +143,12 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
 
 
-    fun subscribeMyChannel() {
+    fun subscribeMyChannel(callInfo: CallInfo) {
 
-        val privateName = if (callInfo.myId.startsWith("private-")) {
-            callInfo.myId
+        val privateName = if (callInfo.me.id.startsWith("private-")) {
+            callInfo.me.id
         } else {
-            "private-${callInfo.myId}"
+            "private-${callInfo.me.id}"
         }
 
         if (myChannel?.isSubscribed == true) {
@@ -170,7 +167,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         }
     }
 
-    fun subscribePresenceChannel() {
+    fun subscribePresenceChannel(callInfo: CallInfo) {
         presenceChannel = pusher.subscribePresence(callInfo.channelName, presencelListener, EVENT_CLIENT_RTC)
 
 
@@ -185,13 +182,13 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
 
     @WorkerThread
-    fun emitCallAttempt() {
+    fun emitCallAttempt(callInfo: CallInfo) {
         Log.d(TAG,"emitCallAttempt")
         pusherApiManager.requestCall(RequestCall(
             event = EVENT_CALL,
-            to = listOf("private-${callInfo.opponentId}"),
+            to = listOf("private-${callInfo.recipient.id}"),
             data = RequestCall.Data(
-                    caller = callInfo.myId,
+                    caller = callInfo.me.id,
                     channel = callInfo.channelName,
                     time = System.currentTimeMillis(),
                     type = callInfo.callType
@@ -200,10 +197,10 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
     }
 
     @WorkerThread
-    fun emitCallDecline() {
+    fun emitCallDecline(callInfo: CallInfo) {
         Log.d(TAG,"emitCallDecline ${RequestDecline(
             event = EVENT_CALL_DECLINE,
-            to = listOf("private-${callInfo.opponentId}"),
+            to = listOf("private-${callInfo.recipient.id}"),
             data = RequestDecline.Data(
                 channel = callInfo.channelName,
                 time = System.currentTimeMillis(),
@@ -212,7 +209,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         )}")
         pusherApiManager.requestDecline(RequestDecline(
             event = EVENT_CALL_DECLINE,
-            to = listOf("private-${callInfo.opponentId}"),
+            to = listOf("private-${callInfo.recipient.id}"),
             data = RequestDecline.Data(
                     channel = callInfo.channelName,
                     time = System.currentTimeMillis(),
@@ -223,10 +220,10 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
     @WorkerThread
     fun emitBusy(callInfo: CallInfo) {
-        Log.d(TAG,"emitBusy: ${callInfo.opponentName}")
+        Log.d(TAG,"emitBusy: ${callInfo.recipient.id}")
         pusherApiManager.requestDecline(RequestDecline(
             event = EVENT_CALL_DECLINE,
-            to = listOf("private-${callInfo.opponentId}"),
+            to = listOf("private-${callInfo.recipient.id}"),
             data = RequestDecline.Data(
                     channel = callInfo.channelName,
                     time = System.currentTimeMillis(),
@@ -244,14 +241,15 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
 
 
-    fun emitOffer(offer: SessionDescription) {
+    fun emitOffer(callInfo: CallInfo, offer: SessionDescription) {
         Log.d(TAG,"emitOffer")
+
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageOffer(
             type = SIGNAL_OFFER,
             time = System.currentTimeMillis(),
             data = MessageOffer.Data(
-                from = callInfo.myId,
-                to = callInfo.opponentId,
+                from = callInfo.me.id,
+                to = callInfo.recipient.id,
                 type = callInfo.callType,
                 description = MessageOffer.Data.Description(
                     type = offer.type.canonicalForm(),
@@ -261,14 +259,14 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         )))
     }
 
-    fun emitIceCandidate(ice: IceCandidate) {
+    fun emitIceCandidate(callInfo: CallInfo, ice: IceCandidate) {
         Log.d(TAG,"emitIceCandidate: $ice")
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageIceCandidate(
             type = SIGNAL_ICE,
             time = System.currentTimeMillis(),
             data = MessageIceCandidate.Data(
-                from = callInfo.myId,
-                to = callInfo.opponentId,
+                from = callInfo.me.id,
+                to = callInfo.recipient.id,
                 candidate = MessageIceCandidate.Data.Candidate(
                     candidate = ice.sdp,
                     sdpMid = ice.sdpMid,
@@ -278,14 +276,14 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         )))
     }
 
-    fun emitAnswer(answer: SessionDescription) {
+    fun emitAnswer(callInfo: CallInfo, answer: SessionDescription) {
         Log.d(TAG,"emitAnswer: $answer")
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageAnswer(
             type = SIGNAL_ANSWER,
             time = System.currentTimeMillis(),
             data = MessageAnswer.Data(
-                from = callInfo.myId,
-                to = callInfo.opponentId,
+                from = callInfo.me.id,
+                to = callInfo.recipient.id,
                 description = MessageAnswer.Data.Description(
                     type = answer.type.canonicalForm(),
                     sdp = answer.description

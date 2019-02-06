@@ -276,7 +276,7 @@ class DirectWebRTCManager(
                     try {
                         localPeer.setLocalDescription(CustomSdpObserver("localSetLocal"), sdp)
                         addEvent(SimpleEvent.OutMessage("Emit answer"))
-                        emitAnswer(sdp, offer)
+                        emitAnswer(sdp)
                         setState(CallState.CALL_RUNNING)
                     } catch (exc: Exception) {
                         onError("Failed sending answer", exc)
@@ -368,9 +368,9 @@ class DirectWebRTCManager(
                         setIceServers(turnServer)
                         createPeerConnection()
 
-                        signalingManager.connect(callInfo) {
-                            signalingManager.subscribeMyChannel()
-                            signalingManager.subscribePresenceChannel()
+                        signalingManager.connect(callInfo.me.id) {
+                            signalingManager.subscribeMyChannel(callInfo)
+                            signalingManager.subscribePresenceChannel(callInfo)
                             addEvent(SimpleEvent.OutMessage("Emit call attempt"))
                             emitCallAttempt()
                             setState(CallState.CALLING_OUT)
@@ -401,8 +401,8 @@ class DirectWebRTCManager(
                         setIceServers(turnServer)
                         createPeerConnection()
 
-                        signalingManager.connect(callInfo) {
-                            signalingManager.subscribeMyChannel()
+                        signalingManager.connect(callInfo.me.id) {
+                            signalingManager.subscribeMyChannel(callInfo)
                             setState(CallState.CALLING_IN)
                             setTimeoutHandling()
                         }
@@ -414,7 +414,7 @@ class DirectWebRTCManager(
                 }
 
             } else {
-                Log.w("DirectSignallingManager", "try emitBusy ${callInfo.opponentId}, ${this.callInfo.opponentId}")
+                Log.w("DirectSignallingManager", "try emitBusy ${callInfo.recipient.name}, ${this.callInfo.recipient.name}")
                 signalingManager.emitBusy(callInfo)
             }
         }
@@ -424,7 +424,7 @@ class DirectWebRTCManager(
         workerHandler.post {
             if (callStateSubject.value == CallState.CALLING_IN) {
                 try {
-                    signalingManager.subscribePresenceChannel()
+                    signalingManager.subscribePresenceChannel(callInfo)
                     addEvent(SimpleEvent.InternalMessage("Awaiting offer"))
                     setState(CallState.AWAITING_OFFER)
                 } catch (exc: Exception) {
@@ -439,7 +439,7 @@ class DirectWebRTCManager(
             callStateSubject.value?.also { state ->
                 try {
                     addEvent(SimpleEvent.OutMessage("Emit decline call"))
-                    signalingManager.emitCallDecline()
+                    signalingManager.emitCallDecline(callInfo)
                     onDecline()
                 } catch (exc: Exception) {
                     onError("Failed decline call", exc)
@@ -460,7 +460,7 @@ class DirectWebRTCManager(
         addEvent(SimpleEvent.InMessage("Decline received"))
         mainHandler.post {
             val message: String = if (decline?.busy == true) {
-                "${callInfo.opponentName} is busy"
+                "${callInfo.recipient.name} is busy"
             } else {
                 "Call ended"
             }
@@ -526,21 +526,25 @@ class DirectWebRTCManager(
 
 
 
-    fun emitIceCandidate(ice: IceCandidate) {
-        signalingManager.emitIceCandidate(ice)
+    @WorkerThread
+    private fun emitIceCandidate(ice: IceCandidate) {
+        signalingManager.emitIceCandidate(callInfo, ice)
     }
 
-    fun emitOffer(offer: SessionDescription) {
-        signalingManager.emitOffer(offer)
+    @WorkerThread
+    private fun emitOffer(offer: SessionDescription) {
+        signalingManager.emitOffer(callInfo, offer)
     }
 
-    fun emitAnswer(answer: SessionDescription, offer: MessageOffer) {
-        signalingManager.emitAnswer(answer)
+    @WorkerThread
+    private fun emitAnswer(answer: SessionDescription) {
+        signalingManager.emitAnswer(callInfo, answer)
         setState(CallState.CALL_RUNNING)
     }
 
+    @WorkerThread
     private fun emitCallAttempt() {
-        signalingManager.emitCallAttempt()
+        signalingManager.emitCallAttempt(callInfo)
     }
 
 

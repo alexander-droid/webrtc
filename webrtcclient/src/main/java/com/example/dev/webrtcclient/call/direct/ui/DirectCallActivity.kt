@@ -88,20 +88,14 @@ class DirectCallActivity : AppCompatActivity() {
 
         fun startVideo(context: Context?) {
             context?.startActivity(Intent(context, DirectCallActivity::class.java).apply {
-                putExtra(
-                    DirectCallService.EXTRA_CALL_TYPE,
-                    DirectWebRTCManager.CALL_TYPE_VIDEO
-                )
+                putExtra(DirectCallService.EXTRA_CALL_TYPE, DirectWebRTCManager.CALL_TYPE_VIDEO)
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
 
         fun startVoice(context: Context?) {
             context?.startActivity(Intent(context, DirectCallActivity::class.java).apply {
-                putExtra(
-                    DirectCallService.EXTRA_CALL_TYPE,
-                    DirectWebRTCManager.CALL_TYPE_VOICE
-                )
+                putExtra(DirectCallService.EXTRA_CALL_TYPE, DirectWebRTCManager.CALL_TYPE_VOICE)
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }

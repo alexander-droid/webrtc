@@ -3,10 +3,13 @@
     package="com.example.dev.webrtcclient">
 
     <application>
+        <activity android:name=".call.ptt.PTTCallActivity"
+            android:screenOrientation="portrait"/>
+
         <service
             android:name=".call.ptt.PTTCallService"
             android:enabled="true"
-            android:exported="false"></service>
+            android:exported="false" />
 
         <activity
             android:name=".call.direct.ui.DirectCallActivity"

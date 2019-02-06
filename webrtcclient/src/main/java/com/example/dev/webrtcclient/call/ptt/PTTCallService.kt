@@ -7,7 +7,10 @@ import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
+import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.GroupCallInfo
+import io.reactivex.Observable
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 
 class PTTCallService : Service(), PTTWebRTCManager.Callback {
@@ -17,6 +20,18 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
     private lateinit var webRTCManager: PTTWebRTCManager
 
     private val disposable = CompositeDisposable()
+
+    val recipientsObservable: Observable<List<CallUserInfo>>
+        get() = webRTCManager.recipientsObservable
+
+    val recipientAddedObservable: Observable<CallUserInfo>
+        get() = webRTCManager.recipientAddedObservable
+
+    val recipientRemovedObservable: Observable<CallUserInfo>
+        get() = webRTCManager.recipientRemovedObservable
+
+    val userTalkingObservable: Observable<CallUserInfo>
+        get() = webRTCManager.userTalkingObservable
 
     override fun onCreate() {
         super.onCreate()
@@ -35,7 +50,8 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
         when(intent?.action) {
             ACTION_JOIN_GROUP -> {
                 retrieveExtras(intent)
-//                PTTCallActivity.start(this)
+                webRTCManager.connect(callInfo)
+                PTTCallActivity.start(this)
             }
             ACTION_LEAVE -> {
                 onLeave("You left the group")
@@ -52,21 +68,16 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
 
         callInfo = GroupCallInfo(
             callType = callType,
-            myId = myName,
-            myName = myName,
+            me = CallUserInfo(
+                id = myName,
+                name = myName
+            ),
             channelName = channelName
         )
 
         Log.d(TAG,"EXTRA_CALL_TYPE $callType")
         Log.d(TAG,"EXTRA_MY_NAME $myName")
         Log.d(TAG,"EXTRA_GROUP_CHANNEL_NAME $channelName")
-
-//        userInfoSubject.onNext(CallUserInfo(
-//            id = opponentName,
-//            data = CallUserInfo.Data(
-//                name = opponentName
-//            )
-//        ))
     }
 
 
@@ -80,7 +91,7 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
     }
 
     fun startTalking() {
-        webRTCManager.startTalking(callInfo)
+        webRTCManager.startTalking()
     }
 
     fun stopTalking() {

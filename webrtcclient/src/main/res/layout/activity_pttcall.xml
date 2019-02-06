@@ -63,7 +63,7 @@
             app:layout_constraintWidth_percent="0.5"
             app:layout_constraintDimensionRatio="1"
             android:textOn="Stop"
-            android:textOff="Speak"
+            android:textOff="Press to talk"
             android:textSize="30sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

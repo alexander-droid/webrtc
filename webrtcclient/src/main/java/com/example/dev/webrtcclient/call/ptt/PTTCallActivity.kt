@@ -42,7 +42,7 @@ class PTTCallActivity : BaseActivity() {
             disposable?.add(
                 service.recipientRemovedObservable
                     .subscribe { userInfo ->
-                        showMessage(message ="${userInfo.name} leaved", bg = ContextCompat.getColor(this@PTTCallActivity, R.color.orange), anchor = button_leave)
+                        showMessage(message ="${userInfo.name} left", bg = ContextCompat.getColor(this@PTTCallActivity, R.color.orange), anchor = button_leave)
                     }
             )
 
@@ -91,8 +91,8 @@ class PTTCallActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pttcall)
 
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL), 0)
+//        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+//        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
 
         audioToggle.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {

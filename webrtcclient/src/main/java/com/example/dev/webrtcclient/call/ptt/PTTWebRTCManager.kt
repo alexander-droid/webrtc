@@ -58,7 +58,10 @@ class PTTWebRTCManager(
 
     private val peerConnectionMap = mutableMapOf<String, MyPeerConnection>()
 
-    private lateinit var turnServer: TurnServer
+    private lateinit var rtcConfig: PeerConnection.RTCConfiguration
+    private val peerIceServers = mutableListOf<PeerConnection.IceServer>()
+    private lateinit var rootEglBase: EglBase
+    lateinit var peerConnectionFactory: PeerConnectionFactory
 
     init {
         handlerThread.start()
@@ -68,7 +71,7 @@ class PTTWebRTCManager(
             try {
                 val turnServer = requestIceServers()
                 if (turnServer != null) {
-                    this.turnServer = turnServer
+                    setIceServers(turnServer)
                 } else {
                     onError( "Failed to receive ice servers")
                 }
@@ -76,6 +79,41 @@ class PTTWebRTCManager(
                 onError( "Failed to receive ice servers", exc)
             }
         }
+    }
+
+    private fun setIceServers(turnServer: TurnServer) {
+        turnServer.iceServerList?.iceServers?.forEach { iceServer ->
+            if (iceServer.credential == null) {
+                val peerIceServer = PeerConnection.IceServer.builder(iceServer.url).createIceServer()
+                peerIceServers.add(peerIceServer)
+            } else {
+                val peerIceServer = PeerConnection.IceServer.builder(iceServer.url)
+                    .setUsername(iceServer.username)
+                    .setPassword(iceServer.credential)
+                    .createIceServer()
+                peerIceServers.add(peerIceServer)
+            }
+        }
+    }
+
+    private fun initInternal() {
+        rootEglBase = EglBase.create()
+
+        val initializationOptions = PeerConnectionFactory.InitializationOptions.builder(context)
+            .createInitializationOptions()
+        PeerConnectionFactory.initialize(initializationOptions)
+
+        peerConnectionFactory = PeerConnectionFactory.builder().createPeerConnectionFactory()
+
+        rtcConfig = PeerConnection.RTCConfiguration(peerIceServers)
+        // TCP candidates are only useful when connecting to a server that supports
+        // ICE-TCP.
+        rtcConfig.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED
+        rtcConfig.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
+        rtcConfig.rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
+        rtcConfig.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+        // Use ECDSA encryption.
+        rtcConfig.keyType = PeerConnection.KeyType.ECDSA
     }
 
     fun connect(callInfo: GroupCallInfo?) {
@@ -113,6 +151,7 @@ class PTTWebRTCManager(
     }
 
     private fun createOffers(groupCallInfo: GroupCallInfo) {
+        initInternal()
         groupCallInfo.recipients.forEach { userInfo ->
             val myPeer = MyPeerConnection(userInfo, true)
             peerConnectionMap[userInfo.id] = myPeer
@@ -195,6 +234,7 @@ class PTTWebRTCManager(
                     members.forEach { member ->
                         if (member.id == offer.data.from) {
                             Log.w(TAG, "ON_OFFER ${offer.data.from}->${offer.data.to} ${offer.data.description}")
+                            initInternal()
                             val myPeer = MyPeerConnection(member, false)
                             peerConnectionMap[member.id] = myPeer
                             myPeer.setOffer(offer)
@@ -245,7 +285,12 @@ class PTTWebRTCManager(
     private fun shouldAcceptTalkingUser(recipient: CallUserInfo): Boolean {
         val callInfo = groupCallInfo
         callInfo?:return false
-        return true
+
+        if (callInfo.me.id != recipient.id) {
+            return true
+        }
+
+        return false
     }
 
     private fun shouldAcceptOffer(offer: MessageOffer): Boolean {
@@ -355,6 +400,7 @@ class PTTWebRTCManager(
             it.value.release()
         }
         peerConnectionMap.clear()
+        workerHandler.removeCallbacksAndMessages(null)
     }
 
     fun release() {
@@ -398,47 +444,8 @@ class PTTWebRTCManager(
 
         private lateinit var localPeer: PeerConnection
 
-        private lateinit var rtcConfig: PeerConnection.RTCConfiguration
-        private val peerIceServers = mutableListOf<PeerConnection.IceServer>()
-        private lateinit var rootEglBase: EglBase
-        lateinit var peerConnectionFactory: PeerConnectionFactory
-
         init {
-            setIceServers(turnServer)
-            rootEglBase = EglBase.create()
-
-            val initializationOptions = PeerConnectionFactory.InitializationOptions.builder(context)
-                .createInitializationOptions()
-            PeerConnectionFactory.initialize(initializationOptions)
-
-            peerConnectionFactory = PeerConnectionFactory.builder().createPeerConnectionFactory()
-
-            rtcConfig = PeerConnection.RTCConfiguration(peerIceServers)
-            // TCP candidates are only useful when connecting to a server that supports
-            // ICE-TCP.
-            rtcConfig.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED
-            rtcConfig.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
-            rtcConfig.rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
-            rtcConfig.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
-            // Use ECDSA encryption.
-            rtcConfig.keyType = PeerConnection.KeyType.ECDSA
-
             createPeerConnection()
-        }
-
-        private fun setIceServers(turnServer: TurnServer) {
-            turnServer.iceServerList?.iceServers?.forEach { iceServer ->
-                if (iceServer.credential == null) {
-                    val peerIceServer = PeerConnection.IceServer.builder(iceServer.url).createIceServer()
-                    peerIceServers.add(peerIceServer)
-                } else {
-                    val peerIceServer = PeerConnection.IceServer.builder(iceServer.url)
-                        .setUsername(iceServer.username)
-                        .setPassword(iceServer.credential)
-                        .createIceServer()
-                    peerIceServers.add(peerIceServer)
-                }
-            }
         }
 
         private fun createPeerConnection() {
@@ -450,11 +457,10 @@ class PTTWebRTCManager(
                 }
             })!!
 
-            if (true) {
+            if (enableOutput) {
                 val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
                 val localAudioTrack = peerConnectionFactory.createAudioTrack("101", audioSource)
                 localAudioTrack.setVolume(10.0)
-                localAudioTrack.setEnabled(enableOutput)
 
                 val stream = peerConnectionFactory.createLocalMediaStream("102")
                 stream.addTrack(localAudioTrack)

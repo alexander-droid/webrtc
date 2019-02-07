@@ -7,6 +7,7 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.util.Log
 import android.view.View
+import com.crashlytics.android.Crashlytics
 import com.example.dev.webrtcclient.EVENT_CALL
 import com.example.dev.webrtcclient.call.direct.DirectCallService
 import com.example.dev.webrtcclient.call.direct.DirectWebRTCManager
@@ -72,7 +73,6 @@ class MainActivity : AppCompatActivity() {
         logAdapter = LogAdapter()
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = logAdapter
-
         initPusher()
 
         callVideoBtn.setOnClickListener {

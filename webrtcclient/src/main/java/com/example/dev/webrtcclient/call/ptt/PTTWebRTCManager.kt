@@ -11,6 +11,7 @@ import com.example.dev.webrtcclient.CustomPeerConnectionObserver
 import com.example.dev.webrtcclient.CustomSdpObserver
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.GroupCallInfo
+import com.example.dev.webrtcclient.model.GroupCallState
 import com.example.dev.webrtcclient.model.message.MessageAnswer
 import com.example.dev.webrtcclient.model.message.MessageIceCandidate
 import com.example.dev.webrtcclient.model.message.MessageOffer
@@ -26,10 +27,9 @@ class PTTWebRTCManager(
     private val callback: Callback
 ) : BaseWebRTCManager(), PTTSignallingManager.Callback {
 
-    private val recipientsSubject = BehaviorSubject.createDefault<MutableList<CallUserInfo>>(mutableListOf())
+    private val recipientsSubject = BehaviorSubject.create<MutableList<CallUserInfo>>()
     private val recipientAddedSubject = PublishSubject.create<CallUserInfo>()
     private val recipientRemovedSubject = PublishSubject.create<CallUserInfo>()
-    private val recipientTalkingSubject = BehaviorSubject.create<CallUserInfo>()
 
     val recipientsObservable: Observable<List<CallUserInfo>>
         get() = recipientsSubject
@@ -44,9 +44,13 @@ class PTTWebRTCManager(
         get() = recipientRemovedSubject
             .observeOn(AndroidSchedulers.mainThread())
 
-    val userTalkingObservable: Observable<CallUserInfo>
-        get() = recipientTalkingSubject
-            .observeOn(AndroidSchedulers.mainThread())
+    private val callStateSubject = BehaviorSubject.createDefault(GroupCallState.none())
+    val callStateObservable: Observable<GroupCallState>
+        get() = callStateSubject.observeOn(AndroidSchedulers.mainThread())
+
+    private val messageSubject = PublishSubject.create<String>()
+    val messageObservable: Observable<String>
+        get() = messageSubject.observeOn(AndroidSchedulers.mainThread())
 
     private var groupCallInfo: GroupCallInfo? = null
 
@@ -73,10 +77,10 @@ class PTTWebRTCManager(
                 if (turnServer != null) {
                     setIceServers(turnServer)
                 } else {
-                    onError( "Failed to receive ice servers")
+                    onError( "Failed to receive ice servers", null, true)
                 }
             } catch (exc: Exception) {
-                onError( "Failed to receive ice servers", exc)
+                onError( "Failed to receive ice servers", exc, true)
             }
         }
     }
@@ -137,22 +141,35 @@ class PTTWebRTCManager(
     //User interaction
     fun startTalking() {
         workerHandler.post {
-            val callInfo = groupCallInfo
-            callInfo?:return@post
-            val members = signalingManager.getGroupMembers(callInfo)
-            if (members.isNotEmpty()) {
-                signalingManager.emitStartTalking(callInfo.me)
-                callInfo.recipients.clear()
-                callInfo.recipients = members
-                createOffers(callInfo)
+            try {
+                if (callStateSubject.value?.state == GroupCallState.State.NONE) {
+                    val callInfo = groupCallInfo
+                    callInfo?:return@post
+                    val members = signalingManager.getGroupMembers(callInfo)
+                    if (members.isNotEmpty()) {
+                        callStateSubject.onNext(GroupCallState.meSpeaking(callInfo.me))
+                        signalingManager.emitStartTalking(callInfo.me)
+                        createOffers(members)
+                    } else {
+                        messageSubject.onNext("No one here")
+                        callStateSubject.value?.also { state ->
+                            callStateSubject.onNext(state)
+                        }
+                    }
+                } else {
+                    callStateSubject.value?.also { state ->
+                        callStateSubject.onNext(state)
+                    }
+                }
+            } catch (exc: Exception) {
+                onError("Error while creating offers", exc)
             }
         }
-
     }
 
-    private fun createOffers(groupCallInfo: GroupCallInfo) {
+    private fun createOffers(members: List<CallUserInfo>) {
         initInternal()
-        groupCallInfo.recipients.forEach { userInfo ->
+        members.forEach { userInfo ->
             val myPeer = MyPeerConnection(userInfo, true)
             peerConnectionMap[userInfo.id] = myPeer
         }
@@ -164,11 +181,16 @@ class PTTWebRTCManager(
 
     fun stopTalking() {
         workerHandler.post {
-            val callInfo = groupCallInfo
-            callInfo?:return@post
-            signalingManager.emitStopTalking(callInfo.me)
-            groupCallInfo?.recipients?.clear()
-            releasePeers()
+            try {
+                if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+                    val callInfo = groupCallInfo
+                    callInfo?:return@post
+                    signalingManager.emitStopTalking(callInfo.me)
+                    releasePeers(callInfo.me)
+                }
+            } catch (exc: Exception) {
+                onError("Error while releasing peers", exc)
+            }
         }
     }
 
@@ -212,15 +234,11 @@ class PTTWebRTCManager(
         }
     }
 
-    override fun onUserTalking(recipient: CallUserInfo) {
+    override fun onUserTalking(recipient: CallUserInfo, isSpeaking: Boolean) {
         workerHandler.post {
-            if (shouldAcceptTalkingUser(recipient)) {
-                if (recipient.isTalking) {
-
-                } else {
-                    releasePeers()
-                }
-                recipientTalkingSubject.onNext(recipient)
+            Log.w("rioferu", "onUserTalking: $isSpeaking")
+            if (!isSpeaking && shouldAcceptUserStopSpeaking(recipient)) {
+                releasePeers(recipient)
             }
         }
     }
@@ -234,12 +252,13 @@ class PTTWebRTCManager(
                     members.forEach { member ->
                         if (member.id == offer.data.from) {
                             Log.w(TAG, "ON_OFFER ${offer.data.from}->${offer.data.to} ${offer.data.description}")
+                            callStateSubject.onNext(GroupCallState.recipientSpeaking(member))
                             initInternal()
                             val myPeer = MyPeerConnection(member, false)
                             peerConnectionMap[member.id] = myPeer
                             myPeer.setOffer(offer)
-                            callInfo.recipients.clear()
-                            callInfo.recipients.add(member)
+
+                            Log.d("rioferu", "onOffer: ${member.id}")
                             return@also
                         }
                     }
@@ -282,11 +301,13 @@ class PTTWebRTCManager(
 
 
 
-    private fun shouldAcceptTalkingUser(recipient: CallUserInfo): Boolean {
+    private fun shouldAcceptUserStopSpeaking(recipient: CallUserInfo): Boolean {
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id != recipient.id) {
+        if (callInfo.me.id != recipient.id
+            && callStateSubject.value?.state == GroupCallState.State.RECIPIENT_SPEAKING
+            && callStateSubject.value?.lastSpeaker?.id == recipient.id) {
             return true
         }
 
@@ -297,7 +318,7 @@ class PTTWebRTCManager(
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id == offer.data.to) {
+        if (callInfo.me.id == offer.data.to && callStateSubject.value?.state == GroupCallState.State.NONE) {
             return true
         }
 
@@ -308,8 +329,8 @@ class PTTWebRTCManager(
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id == answer.data.to) {
-            return true
+        if (callInfo.me.id == answer.data.to && callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+            return peerConnectionMap.contains(answer.data.from)
         }
 
         return false
@@ -320,7 +341,7 @@ class PTTWebRTCManager(
         callInfo?:return false
 
         if (callInfo.me.id == ice.data.to) {
-            return true
+            return peerConnectionMap.contains(ice.data.from)
         }
 
         return false
@@ -388,14 +409,32 @@ class PTTWebRTCManager(
 
 
 
-    override fun onError(message: String?, exception: Exception?) {
-        Log.e(TAG, message, exception)
-        mainHandler.post {
-            callback.onLeave(message)
+    override fun onError(message: String?, exception: Exception?, leave: Boolean) {
+        workerHandler.post {
+            Log.e(TAG, message, exception)
+            message?.also {
+                messageSubject.onNext(it)
+            }
+
+            if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+                groupCallInfo?.also { callInfo ->
+                    signalingManager.emitStopTalking(callInfo.me)
+                }
+            }
+
+            releasePeers()
+            if (leave) {
+                callback.onLeave()
+            }
         }
     }
 
-    private fun releasePeers() {
+    private fun releasePeers(lastSpokenUser: CallUserInfo? = null) {
+        lastSpokenUser?.also { user ->
+            callStateSubject.onNext(GroupCallState.stoppedSpeaking(user))
+        } ?: run {
+            callStateSubject.onNext(GroupCallState.none())
+        }
         peerConnectionMap.forEach {
             it.value.release()
         }
@@ -408,10 +447,10 @@ class PTTWebRTCManager(
             try {
                 recipientAddedSubject.onComplete()
                 recipientRemovedSubject.onComplete()
-                recipientTalkingSubject.onComplete()
+                callStateSubject.onComplete()
                 recipientsSubject.onComplete()
                 signalingManager.disconnect()
-//                releasePeers()
+                releasePeers()
                 workerHandler.removeCallbacksAndMessages(null)
                 mainHandler.removeCallbacksAndMessages(null)
                 handlerThread.quit()
@@ -570,7 +609,11 @@ class PTTWebRTCManager(
         fun release() {
             Log.e(TAG, "release ${userInfo.id}")
             Log.e("my_peer", "release ${userInfo.id}")
-            localPeer.dispose()
+            try {
+                localPeer.dispose()
+            } catch (exc: Exception) {
+                Log.e("my_peer", "error while release peer", exc)
+            }
         }
     }
 }

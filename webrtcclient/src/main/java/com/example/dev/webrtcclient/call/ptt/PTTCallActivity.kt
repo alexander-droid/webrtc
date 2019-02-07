@@ -14,6 +14,7 @@ import android.view.View
 import android.widget.TextView
 import com.example.dev.webrtcclient.BaseActivity
 import com.example.dev.webrtcclient.R
+import com.example.dev.webrtcclient.model.GroupCallState
 import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.activity_pttcall.*
 
@@ -47,21 +48,6 @@ class PTTCallActivity : BaseActivity() {
             )
 
             disposable?.add(
-                service.userTalkingObservable
-                    .subscribe { userInfo ->
-                        if (userInfo.isTalking) {
-                            talkingTextView.visibility = View.VISIBLE
-                            talkingTextView.text = "${userInfo.name} is speaking"
-//                            audioBtn.isEnabled = false
-                        } else {
-                            talkingTextView.visibility = View.GONE
-                            talkingTextView.text = ""
-//                            audioBtn.isEnabled = true
-                        }
-                    }
-            )
-
-            disposable?.add(
                 service.recipientsObservable
                     .subscribe { userInfoList ->
                         loadingView.visibility = View.GONE
@@ -83,8 +69,37 @@ class PTTCallActivity : BaseActivity() {
                         }
                     }
             )
-        }
 
+            disposable?.add(
+                service.callStateObservable
+                    .subscribe { state ->
+                        when(state.state) {
+                            GroupCallState.State.NONE -> {
+                                talkingTextView.visibility = View.GONE
+                                talkingTextView.text = ""
+                                audioToggle.isChecked = false
+                            }
+                            GroupCallState.State.ME_SPEAKING -> {
+                                talkingTextView.visibility = View.VISIBLE
+                                talkingTextView.text = "You are speaking"
+                                audioToggle.isChecked = true
+                            }
+                            GroupCallState.State.RECIPIENT_SPEAKING -> {
+                                talkingTextView.visibility = View.VISIBLE
+                                talkingTextView.text = "${state.lastSpeaker?.name} is speaking"
+                                audioToggle.isChecked = false
+                            }
+                        }
+                    }
+            )
+
+            disposable?.add(
+                service.messageObservable
+                    .subscribe {
+                        showMessage(it, anchor = button_leave)
+                    }
+            )
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

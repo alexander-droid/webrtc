@@ -1,6 +1,6 @@
 package com.example.dev.webrtcclient.model
 
-enum class CallState(value: Int) {
+enum class DirectCallState(value: Int) {
     NONE(0),
 
     INITIALIZING_CALLING_IN(1),

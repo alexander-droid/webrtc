@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/CallTest.iml" filepath="$PROJECT_DIR$/CallTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/webrtc.iml" filepath="$PROJECT_DIR$/webrtc.iml" />
       <module fileurl="file://$PROJECT_DIR$/webrtcclient/webrtcclient.iml" filepath="$PROJECT_DIR$/webrtcclient/webrtcclient.iml" />

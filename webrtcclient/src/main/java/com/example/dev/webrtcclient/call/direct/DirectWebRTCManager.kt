@@ -5,33 +5,25 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.support.annotation.WorkerThread
-import android.util.Base64
 import android.util.Log
 import com.example.dev.webrtcclient.BaseWebRTCManager
 import com.example.dev.webrtcclient.CustomPeerConnectionObserver
 import com.example.dev.webrtcclient.CustomSdpObserver
-import com.example.dev.webrtcclient.api.XirsysApi
 import com.example.dev.webrtcclient.log.SimpleEvent
 import com.example.dev.webrtcclient.model.CallInfo
-import com.example.dev.webrtcclient.model.CallState
+import com.example.dev.webrtcclient.model.DirectCallState
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.message.MessageAnswer
 import com.example.dev.webrtcclient.model.message.MessageDecline
 import com.example.dev.webrtcclient.model.message.MessageIceCandidate
 import com.example.dev.webrtcclient.model.message.MessageOffer
 import com.example.dev.webrtcclient.model.response.TurnServer
-import com.google.gson.Gson
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
-import okhttp3.OkHttpClient
 import org.webrtc.*
-import org.webrtc.voiceengine.WebRtcAudioUtils
-import retrofit2.Retrofit
-import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
-import retrofit2.converter.gson.GsonConverterFactory
 
 class DirectWebRTCManager(
     private val context: Context,
@@ -53,8 +45,8 @@ class DirectWebRTCManager(
     val remoteVideoTrackObserver: Observable<VideoTrack>
         get() = remoteVideoTrackSubject.observeOn(AndroidSchedulers.mainThread())
 
-    private val callStateSubject = BehaviorSubject.createDefault(CallState.NONE)
-    val callStateObservable: Observable<CallState>
+    private val callStateSubject = BehaviorSubject.createDefault(DirectCallState.NONE)
+    val callStateObservable: Observable<DirectCallState>
         get() = callStateSubject.observeOn(AndroidSchedulers.mainThread())
 
 
@@ -249,7 +241,7 @@ class DirectWebRTCManager(
                 workerHandler.post {
                     try {
                         localPeer.setLocalDescription(CustomSdpObserver("localSetLocalDesc"), sessionDescription)
-                        setState(CallState.AWAITING_ANSWER)
+                        setState(DirectCallState.AWAITING_ANSWER)
                         addEvent(SimpleEvent.OutMessage("Emit offer"))
                         emitOffer(sessionDescription)
                     } catch (exc: Exception) {
@@ -277,7 +269,7 @@ class DirectWebRTCManager(
                         localPeer.setLocalDescription(CustomSdpObserver("localSetLocal"), sdp)
                         addEvent(SimpleEvent.OutMessage("Emit answer"))
                         emitAnswer(sdp)
-                        setState(CallState.CALL_RUNNING)
+                        setState(DirectCallState.CALL_RUNNING)
                     } catch (exc: Exception) {
                         onError("Failed sending answer", exc)
                     }
@@ -315,7 +307,7 @@ class DirectWebRTCManager(
             override fun onSetSuccess() {
                 workerHandler.post {
                     try {
-                        setState(CallState.CREATING_ANSWER)
+                        setState(DirectCallState.CREATING_ANSWER)
                         createAnswer(offer)
                     } catch (exc: Exception) {
                         onError("Failed creating answer", exc)
@@ -337,7 +329,7 @@ class DirectWebRTCManager(
 
             override fun onSetSuccess() {
                 workerHandler.post {
-                    setState(CallState.CALL_RUNNING)
+                    setState(DirectCallState.CALL_RUNNING)
                 }
             }
 
@@ -356,10 +348,10 @@ class DirectWebRTCManager(
     //User interaction
     fun doCall(callInfo: CallInfo) {
         workerHandler.post {
-            if (callStateSubject.value == CallState.NONE) {
+            if (callStateSubject.value == DirectCallState.NONE) {
                 this.withVideo = callInfo.callType == CALL_TYPE_VIDEO
                 this.callInfo = callInfo
-                setState(CallState.INITIALIZING_CALLING_OUT)
+                setState(DirectCallState.INITIALIZING_CALLING_OUT)
                 setTimeoutHandling()
                 try {
                     initInternal()
@@ -373,7 +365,7 @@ class DirectWebRTCManager(
                             signalingManager.subscribePresenceChannel(callInfo)
                             addEvent(SimpleEvent.OutMessage("Emit call attempt"))
                             emitCallAttempt()
-                            setState(CallState.CALLING_OUT)
+                            setState(DirectCallState.CALLING_OUT)
                         }
                     } else {
                         onError( "Failed to receive ice servers")
@@ -389,10 +381,10 @@ class DirectWebRTCManager(
         Log.w("DirectSignallingManager", "callReceived $callInfo")
         Log.w("DirectSignallingManager", "call state: ${callStateSubject.value}")
         workerHandler.post {
-            if (callStateSubject.value == CallState.NONE) {
+            if (callStateSubject.value == DirectCallState.NONE) {
                 this.callInfo = callInfo
                 this.withVideo = callInfo.callType == CALL_TYPE_VIDEO
-                setState(CallState.INITIALIZING_CALLING_IN)
+                setState(DirectCallState.INITIALIZING_CALLING_IN)
 
                 try {
                     initInternal()
@@ -403,7 +395,7 @@ class DirectWebRTCManager(
 
                         signalingManager.connect(callInfo.me.id) {
                             signalingManager.subscribeMyChannel(callInfo)
-                            setState(CallState.CALLING_IN)
+                            setState(DirectCallState.CALLING_IN)
                             setTimeoutHandling()
                         }
                     } else {
@@ -422,11 +414,11 @@ class DirectWebRTCManager(
 
     fun answerCall() {
         workerHandler.post {
-            if (callStateSubject.value == CallState.CALLING_IN) {
+            if (callStateSubject.value == DirectCallState.CALLING_IN) {
                 try {
                     signalingManager.subscribePresenceChannel(callInfo)
                     addEvent(SimpleEvent.InternalMessage("Awaiting offer"))
-                    setState(CallState.AWAITING_OFFER)
+                    setState(DirectCallState.AWAITING_OFFER)
                 } catch (exc: Exception) {
                     onError( "Failed to answer call", exc)
                 }
@@ -471,8 +463,8 @@ class DirectWebRTCManager(
     override fun onOffer(offer: MessageOffer) {
         addEvent(SimpleEvent.InMessage("Offer received"))
         workerHandler.post {
-            if (callStateSubject.value == CallState.AWAITING_OFFER) {
-                setState(CallState.SETTING_OFFER)
+            if (callStateSubject.value == DirectCallState.AWAITING_OFFER) {
+                setState(DirectCallState.SETTING_OFFER)
                 setOffer(offer)
             }
         }
@@ -481,8 +473,8 @@ class DirectWebRTCManager(
     override fun onAnswer(answer: MessageAnswer) {
         addEvent(SimpleEvent.InMessage("Answer received"))
         workerHandler.post {
-            if (callStateSubject.value == CallState.AWAITING_ANSWER) {
-                setState(CallState.SETTING_ANSWER)
+            if (callStateSubject.value == DirectCallState.AWAITING_ANSWER) {
+                setState(DirectCallState.SETTING_ANSWER)
                 setAnswer(answer)
             }
         }
@@ -497,8 +489,8 @@ class DirectWebRTCManager(
 
     override fun onGenerateOffer() {
         workerHandler.post {
-            if (callStateSubject.value == CallState.CALLING_OUT) {
-                setState(CallState.CREATING_OFFER)
+            if (callStateSubject.value == DirectCallState.CALLING_OUT) {
+                setState(DirectCallState.CREATING_OFFER)
                 createOffer()
             }
         }
@@ -514,7 +506,7 @@ class DirectWebRTCManager(
 
     override fun onOpponentUnsubscribed(userInfo: CallUserInfo) {
         callStateSubject.value?.also { state ->
-            if (state < CallState.CALL_RUNNING) {
+            if (state < DirectCallState.CALL_RUNNING) {
                 //TODO
             }
         }
@@ -539,7 +531,7 @@ class DirectWebRTCManager(
     @WorkerThread
     private fun emitAnswer(answer: SessionDescription) {
         signalingManager.emitAnswer(callInfo, answer)
-        setState(CallState.CALL_RUNNING)
+        setState(DirectCallState.CALL_RUNNING)
     }
 
     @WorkerThread
@@ -554,13 +546,13 @@ class DirectWebRTCManager(
 
 
 
-    private fun setState(state: CallState) {
+    private fun setState(state: DirectCallState) {
         callStateSubject.onNext(state)
     }
 
     private fun setTimeoutHandling() {
         timeoutHandler.postDelayed({
-            if (callStateSubject.value != CallState.CALL_RUNNING) {
+            if (callStateSubject.value != DirectCallState.CALL_RUNNING) {
                 declineCall()
             }
         }, timeout)

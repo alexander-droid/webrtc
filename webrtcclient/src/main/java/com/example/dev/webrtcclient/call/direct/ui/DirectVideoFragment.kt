@@ -15,7 +15,6 @@ import android.view.ViewGroup
 import com.example.dev.webrtcclient.R
 import com.example.dev.webrtcclient.call.direct.DirectCallService
 import com.example.dev.webrtcclient.log.LogAdapter
-import com.example.dev.webrtcclient.model.CallState
 import com.example.dev.webrtcclient.model.CallViewState
 import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.fragment_direct_video.*

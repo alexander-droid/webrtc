@@ -105,43 +105,42 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
     private fun fetchOffer(data: String) {
         val offer = Gson().fromJson(data, MessageOffer::class.java)
-        Log.i(TAG, "OFFER_RECEIVED: $offer")
+        Log.i(TAG, "OFFER_RECEIVED")
         callback.onOffer(offer)
     }
 
     private fun fetchAnswer(data: String) {
         val answer = Gson().fromJson(data, MessageAnswer::class.java)
-        Log.i(TAG, "ANSWER_RECEIVED: $answer")
+        Log.i(TAG, "ANSWER_RECEIVED")
         callback.onAnswer(answer)
     }
 
     private fun fetchIce(data: String) {
         val ice = Gson().fromJson(data, MessageIceCandidate::class.java)
-        Log.i(TAG, "ICE_RECEIVED: $ice")
+        Log.i(TAG, "ICE_RECEIVED")
         callback.onIce(ice)
     }
 
     private fun handleTalkingEvent(data: String) {
         val jsonData = JSONObject(data)
         var talkingUserId: String? = null
-        var isTalking = false
+        var isSpeaking = false
         if (jsonData.has("talking")) {
             talkingUserId = jsonData.getString("talking")
-            isTalking = true
+            isSpeaking = true
         } else if (jsonData.has("stop")) {
             talkingUserId = jsonData.getString("stop")
-            isTalking = false
+            isSpeaking = false
         }
 
         if (talkingUserId != null) {
             val recipient = CallUserInfo(
                 id = talkingUserId,
-                name = talkingUserId,
-                isTalking = isTalking
+                name = talkingUserId
             )
 
-            Log.v(TAG, "TALKING_RECEIVED: $recipient")
-            callback.onUserTalking(recipient)
+            Log.v(TAG, "TALKING_RECEIVED: ${recipient.id}, isSpeaking: $isSpeaking")
+            callback.onUserTalking(recipient, isSpeaking)
         }
     }
 
@@ -173,7 +172,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
     }
 
     fun emitIceCandidate(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, ice: IceCandidate) {
-        Log.d(TAG,"emitIceCandidate: $ice")
+        Log.d(TAG,"emitIceCandidate")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageIceCandidate(
             type = SIGNAL_ICE,
             time = System.currentTimeMillis(),
@@ -190,7 +189,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
     }
 
     fun emitAnswer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, answer: SessionDescription) {
-        Log.d(TAG,"emitAnswer: $answer")
+        Log.d(TAG,"emitAnswer")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageAnswer(
             type = SIGNAL_ANSWER,
             time = System.currentTimeMillis(),
@@ -226,7 +225,12 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
         Log.v(TAG,"emitStopTalking: $recipientInfo")
         val jsonData = JSONObject()
         jsonData.put("stop", recipientInfo.id)
-        groupChannel?.trigger(EVENT_GROUP_TALK, jsonData.toString())
+        try {
+            groupChannel?.trigger(EVENT_GROUP_TALK, jsonData.toString())
+        } catch (exc: Exception) {
+            Log.e(TAG, "Error while emitting", exc)
+            //TODO
+        }
     }
 
 
@@ -264,14 +268,14 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
 
     interface Callback {
-        fun onError(message: String?, exception: Exception? = null)
+        fun onError(message: String?, exception: Exception? = null, leave: Boolean = false)
         fun onRecipientsInformationReceived(recipientInfoList: MutableList<CallUserInfo>)
         fun onRecipientSubscribed(recipientInfo: CallUserInfo)
         fun onRecipientUnsubscribed(recipientInfo: CallUserInfo)
         fun onOffer(offer: MessageOffer)
         fun onAnswer(answer: MessageAnswer)
         fun onIce(ice: MessageIceCandidate)
-        fun onUserTalking(recipient: CallUserInfo)
+        fun onUserTalking(recipient: CallUserInfo, isSpeaking: Boolean)
     }
 
     companion object {

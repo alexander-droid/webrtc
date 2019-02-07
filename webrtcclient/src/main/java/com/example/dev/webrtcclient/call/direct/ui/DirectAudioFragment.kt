@@ -14,7 +14,7 @@ import android.view.ViewGroup
 import com.example.dev.webrtcclient.R
 import com.example.dev.webrtcclient.call.direct.DirectCallService
 import com.example.dev.webrtcclient.log.LogAdapter
-import com.example.dev.webrtcclient.model.CallState
+import com.example.dev.webrtcclient.model.DirectCallState
 import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.fragment_direct_audio.*
 
@@ -40,9 +40,9 @@ class DirectAudioFragment : Fragment() {
                 service.callStateObservable
                     .subscribe { callState ->
                         when(callState) {
-                            CallState.CALLING_OUT -> applyCallingOut()
-                            CallState.CALLING_IN -> applyCallingIn()
-                            CallState.CALL_RUNNING -> applyCallRunning()
+                            DirectCallState.CALLING_OUT -> applyCallingOut()
+                            DirectCallState.CALLING_IN -> applyCallingIn()
+                            DirectCallState.CALL_RUNNING -> applyCallRunning()
                             null -> {
 
                             }

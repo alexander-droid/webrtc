@@ -13,7 +13,7 @@ import com.example.dev.webrtcclient.call.direct.DirectWebRTCManager.Companion.CA
 import com.example.dev.webrtcclient.call.direct.ui.DirectCallActivity
 import com.example.dev.webrtcclient.log.SimpleEvent
 import com.example.dev.webrtcclient.model.CallInfo
-import com.example.dev.webrtcclient.model.CallState
+import com.example.dev.webrtcclient.model.DirectCallState
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.CallViewState
 import io.reactivex.Observable
@@ -34,7 +34,7 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     val userInfoObservable: Observable<CallUserInfo>
         get() = userInfoSubject
 
-    val callStateObservable: Observable<CallState>
+    val callStateObservable: Observable<DirectCallState>
         get() = webRTCManager.callStateObservable
 
     val loglist: MutableList<SimpleEvent>
@@ -46,22 +46,22 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
         get() = webRTCManager.callStateObservable
             .map {
                 return@map when(it) {
-                    CallState.NONE -> CallViewState.NONE
-                    CallState.INITIALIZING_CALLING_IN,
-                    CallState.CALLING_IN -> {
+                    DirectCallState.NONE -> CallViewState.NONE
+                    DirectCallState.INITIALIZING_CALLING_IN,
+                    DirectCallState.CALLING_IN -> {
                         CallViewState.CALLING_IN
                     }
-                    CallState.INITIALIZING_CALLING_OUT,
-                    CallState.CALLING_OUT,
-                    CallState.CREATING_OFFER,
-                    CallState.AWAITING_ANSWER,
-                    CallState.SETTING_ANSWER -> {
+                    DirectCallState.INITIALIZING_CALLING_OUT,
+                    DirectCallState.CALLING_OUT,
+                    DirectCallState.CREATING_OFFER,
+                    DirectCallState.AWAITING_ANSWER,
+                    DirectCallState.SETTING_ANSWER -> {
                         CallViewState.CALLING_OUT
                     }
-                    CallState.AWAITING_OFFER,
-                    CallState.SETTING_OFFER,
-                    CallState.CREATING_ANSWER,
-                    CallState.CALL_RUNNING -> CallViewState.CALL_RUNNING
+                    DirectCallState.AWAITING_OFFER,
+                    DirectCallState.SETTING_OFFER,
+                    DirectCallState.CREATING_ANSWER,
+                    DirectCallState.CALL_RUNNING -> CallViewState.CALL_RUNNING
                 }
             }
             .distinctUntilChanged()
@@ -186,24 +186,24 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
 
 
-    private fun applyState(callState: CallState) {
+    private fun applyState(callState: DirectCallState) {
         when(callState) {
-            CallState.INITIALIZING_CALLING_OUT -> {
+            DirectCallState.INITIALIZING_CALLING_OUT -> {
                 val notification = callNotificationHelper.getOutComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
-            CallState.CALLING_IN -> {
+            DirectCallState.CALLING_IN -> {
                 val notification = callNotificationHelper.getInComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 wakeUp()
             }
-            CallState.AWAITING_OFFER -> {
+            DirectCallState.AWAITING_OFFER -> {
                 val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
-            CallState.CALL_RUNNING -> {
+            DirectCallState.CALL_RUNNING -> {
                 val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
             }

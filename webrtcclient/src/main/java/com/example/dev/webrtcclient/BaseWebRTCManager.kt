@@ -24,6 +24,7 @@ abstract class BaseWebRTCManager {
 
     init {
         WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true)
+        WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true)
         WebRtcAudioManager.setStereoInput(true)
         WebRtcAudioManager.setStereoOutput(true)
     }

@@ -56,16 +56,16 @@ class DirectCallNotificationHelper(private val context: Context) {
         }
 
         val answerString = SpannableString("Answer")
-        answerString.setSpan(ForegroundColorSpan(ContextCompat.getColor(context, R.color.green)), 0, answerString.length, 0);
+        answerString.setSpan(ForegroundColorSpan(ContextCompat.getColor(context, R.color.green)), 0, answerString.length, 0)
 
         val declineString = SpannableString("Decline")
-        declineString.setSpan(ForegroundColorSpan(ContextCompat.getColor(context, R.color.red)), 0, declineString.length, 0);
+        declineString.setSpan(ForegroundColorSpan(ContextCompat.getColor(context, R.color.red)), 0, declineString.length, 0)
 
         val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         return NotificationCompat.Builder(context, DirectCallService.CHANNEL_ID_INCOMING_CALL)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setSmallIcon(R.drawable.ic_notification)
+                .setSmallIcon(R.drawable.ic_notificatio)
                 .setContentTitle(name)
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI, AudioManager.STREAM_NOTIFICATION)
                 .setContentText(contentText)
@@ -93,7 +93,7 @@ class DirectCallNotificationHelper(private val context: Context) {
         }
 
         return NotificationCompat.Builder(context, DirectCallService.CHANNEL_ID_CALL)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_notificatio)
             .setContentTitle(name)
             .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -115,7 +115,7 @@ class DirectCallNotificationHelper(private val context: Context) {
         }
 
         return NotificationCompat.Builder(context, DirectCallService.CHANNEL_ID_CALL)
-            .setSmallIcon( R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_notificatio)
             .setContentTitle(name)
             .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

@@ -3,17 +3,39 @@ package com.example.dev.webrtcclient.call.ptt
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Binder
-import android.os.IBinder
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.*
 import android.util.Log
 import android.widget.Toast
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.GroupCallInfo
+import com.example.dev.webrtcclient.model.GroupCallState
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 
 class PTTCallService : Service(), PTTWebRTCManager.Callback {
+
+    private lateinit var audioManager: AudioManager
+
+    private lateinit var focusRequest: AudioFocusRequest
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        var typeOfChange = "AUDIOFOCUS_NOT_DEFINED"
+        typeOfChange = when (focusChange) {
+            AudioManager.AUDIOFOCUS_GAIN -> "AUDIOFOCUS_GAIN"
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT -> "AUDIOFOCUS_GAIN_TRANSIENT"
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE -> "AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE"
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK -> "AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK"
+            AudioManager.AUDIOFOCUS_LOSS -> "AUDIOFOCUS_LOSS"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> "AUDIOFOCUS_LOSS_TRANSIENT"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> "AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK"
+            else -> "AUDIOFOCUS_INVALID"
+        }
+        Log.e(TAG, "onAudioFocusChange: $typeOfChange")
+    }
 
     private var callInfo: GroupCallInfo? = null
 
@@ -30,11 +52,35 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
     val recipientRemovedObservable: Observable<CallUserInfo>
         get() = webRTCManager.recipientRemovedObservable
 
-    val userTalkingObservable: Observable<CallUserInfo>
-        get() = webRTCManager.userTalkingObservable
+    val callStateObservable: Observable<GroupCallState>
+        get() = webRTCManager.callStateObservable
+
+    val messageObservable: Observable<String>
+        get() = webRTCManager.messageObservable
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isMicrophoneMute = false
+        audioManager.isSpeakerphoneOn = true
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).run {
+                setAudioAttributes(AudioAttributes.Builder().run {
+                    setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    build()
+                })
+                setAcceptsDelayedFocusGain(true)
+                setOnAudioFocusChangeListener(audioFocusChangeListener, Handler(Looper.getMainLooper()))
+                build()
+            }
+            audioManager.requestAudioFocus(focusRequest)
+        } else {
+            audioManager.requestAudioFocus(audioFocusChangeListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        }
+
         webRTCManager = PTTWebRTCManager(this, this)
     }
 
@@ -42,6 +88,12 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
         super.onDestroy()
         disposable.dispose()
         webRTCManager.release()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioManager.abandonAudioFocusRequest(focusRequest)
+        } else {
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,10 +155,12 @@ class PTTCallService : Service(), PTTWebRTCManager.Callback {
 
     //WebRTC callbacks
     override fun onLeave(message: String?) {
-        message?.also {
-            Toast.makeText(this, it, Toast.LENGTH_LONG).show()
+        Handler(Looper.getMainLooper()).post {
+            message?.also {
+                Toast.makeText(this, it, Toast.LENGTH_LONG).show()
+            }
+            stopSelf()
         }
-        stopSelf()
     }
 
 

@@ -1,29 +1,39 @@
 package com.example.dev.webrtcclient.call.direct
 
-import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Binder
-import android.os.IBinder
-import android.os.PowerManager
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.ToneGenerator
+import android.os.*
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import com.example.dev.webrtcclient.BaseCallService
 import com.example.dev.webrtcclient.call.direct.DirectWebRTCManager.Companion.CALL_TYPE_VIDEO
 import com.example.dev.webrtcclient.call.direct.DirectWebRTCManager.Companion.CALL_TYPE_VOICE
 import com.example.dev.webrtcclient.call.direct.ui.DirectCallActivity
 import com.example.dev.webrtcclient.log.SimpleEvent
 import com.example.dev.webrtcclient.model.CallInfo
-import com.example.dev.webrtcclient.model.DirectCallState
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.CallViewState
+import com.example.dev.webrtcclient.model.DirectCallState
 import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import org.webrtc.EglBase
 import org.webrtc.VideoTrack
+import java.lang.reflect.Array.getLength
+import android.content.res.AssetFileDescriptor
+import com.example.dev.webrtcclient.R
+import java.io.IOException
 
 
-class DirectCallService : Service(), DirectWebRTCManager.Callback {
+class DirectCallService : BaseCallService(), DirectWebRTCManager.Callback {
+
+    private val callBeepHandler = Handler(Looper.getMainLooper())
+    private val callVibrationHandler = Handler(Looper.getMainLooper())
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wakeLockCPU: PowerManager.WakeLock? = null
@@ -86,6 +96,10 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
     private var isFirstLaunch = true
 
+    private var incomingCallPlayer: MediaPlayer? = null
+    private lateinit var toneGenerator: ToneGenerator
+    private lateinit var vibrator: Vibrator
+
     override fun onCreate() {
         super.onCreate()
         Log.e(TAG, "onCreate")
@@ -96,6 +110,19 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
         disposable.add(callStateObservable.subscribe {
             applyState(it)
         })
+
+
+        try {
+            incomingCallPlayer = MediaPlayer()
+            incomingCallPlayer?.setAudioStreamType(AudioManager.STREAM_VOICE_CALL)
+            incomingCallPlayer?.setDataSource(this, Settings.System.DEFAULT_RINGTONE_URI)
+            incomingCallPlayer?.prepare()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        toneGenerator = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 100)
+        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
 
     override fun onDestroy() {
@@ -106,6 +133,13 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
 
         wakeLock?.release()
         wakeLockCPU?.release()
+
+        stopIncomingCallSound()
+        stopVibrate()
+        stopBeeping()
+
+        toneGenerator.release()
+        incomingCallPlayer?.release()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -145,6 +179,40 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
                 DirectCallActivity.startVoice(this)
             }
         }
+    }
+
+    private fun beep() {
+        callBeepHandler.postDelayed({
+            toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL, 1500)
+            beep()
+        }, 5000)
+    }
+
+    private fun vibrate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            vibrator.vibrate(1000)
+        }
+//        callVibrationHandler.postDelayed({vibrate()}, 5000)
+    }
+
+    private fun startIncomingCallSound() {
+        incomingCallPlayer?.start()
+    }
+
+    private fun stopVibrate() {
+        callVibrationHandler.removeCallbacksAndMessages(null)
+        vibrator.cancel()
+    }
+
+    private fun stopIncomingCallSound() {
+        incomingCallPlayer?.stop()
+    }
+
+    private fun stopBeeping() {
+        callBeepHandler.removeCallbacksAndMessages(null)
+        toneGenerator.stopTone()
     }
 
 
@@ -189,21 +257,34 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     private fun applyState(callState: DirectCallState) {
         when(callState) {
             DirectCallState.INITIALIZING_CALLING_OUT -> {
+                Log.d(TAG, "INITIALIZING_CALLING_OUT")
+                beep()
                 val notification = callNotificationHelper.getOutComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             DirectCallState.CALLING_IN -> {
+                Log.d(TAG, "CALLING_IN")
+                vibrate()
+                startIncomingCallSound()
                 val notification = callNotificationHelper.getInComingCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 wakeUp()
             }
             DirectCallState.AWAITING_OFFER -> {
+                Log.d(TAG, "AWAITING_OFFER")
+                stopBeeping()
+                stopVibrate()
+                stopIncomingCallSound()
                 val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
                 startCallActivity()
             }
             DirectCallState.CALL_RUNNING -> {
+                Log.d(TAG, "CALL_RUNNING")
+                stopBeeping()
+                stopVibrate()
+                stopIncomingCallSound()
                 val notification = callNotificationHelper.getRunningCallNotification(callInfo.callType, callInfo.recipient.name)
                 startForeground(DirectCallService.CALL_NOTIFICATION_ID, notification)
             }
@@ -268,8 +349,6 @@ class DirectCallService : Service(), DirectWebRTCManager.Callback {
     }
 
     companion object {
-
-        private const val TAG = "DirectCallService"
 
         const val CHANNEL_ID_INCOMING_CALL = "CHANNEL_ID_INCOMING_CALL"
         const val CHANNEL_ID_CALL = "CHANNEL_ID_CALL"

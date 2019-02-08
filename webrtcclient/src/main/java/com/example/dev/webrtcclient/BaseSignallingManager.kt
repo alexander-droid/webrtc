@@ -87,7 +87,11 @@ abstract class BaseSignallingManager {
     @CallSuper
     open fun disconnect() {
         Log.d(TAG, "disconnect")
-        pusher.disconnect()
+        try {
+            pusher.disconnect()
+        } catch (exc: Exception) {
+            Log.e(TAG, "disconnect", exc)
+        }
         disposable.dispose()
     }
 

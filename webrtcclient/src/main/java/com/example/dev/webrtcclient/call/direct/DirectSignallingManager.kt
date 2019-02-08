@@ -198,15 +198,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
 
     @WorkerThread
     fun emitCallDecline(callInfo: CallInfo) {
-        Log.d(TAG,"emitCallDecline ${RequestDecline(
-            event = EVENT_CALL_DECLINE,
-            to = listOf("private-${callInfo.recipient.id}"),
-            data = RequestDecline.Data(
-                channel = callInfo.channelName,
-                time = System.currentTimeMillis(),
-                busy = false
-            )
-        )}")
+        Log.d(TAG,"emitCallDecline")
         pusherApiManager.requestDecline(RequestDecline(
             event = EVENT_CALL_DECLINE,
             to = listOf("private-${callInfo.recipient.id}"),

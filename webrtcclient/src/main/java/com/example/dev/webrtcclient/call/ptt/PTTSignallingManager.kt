@@ -25,7 +25,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
                 val recipientInfoList = mutableListOf<CallUserInfo>()
                 users.forEach { user ->
                     map(user)?.also { recipientInfo ->
-                        Log.i(TAG, "onUsersInformationReceived ${recipientInfo}")
+                        Log.i(TAG, "onUsersInformationReceived $recipientInfo")
                         if (callInfo.me.id != recipientInfo.id) {
                             recipientInfoList.add(recipientInfo)
                         }
@@ -37,12 +37,14 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
             override fun userUnsubscribed(channelName: String, user: User) {
                 map(user)?.also { recipientInfo ->
+                    Log.w(TAG, "User Left $recipientInfo")
                     callback.onRecipientUnsubscribed(recipientInfo)
                 }
             }
 
             override fun userSubscribed(channelName: String, user: User) {
                 map(user)?.also { recipientInfo ->
+                    Log.d(TAG, "User Joined $recipientInfo")
                     callback.onRecipientSubscribed(recipientInfo)
                 }
             }
@@ -105,13 +107,13 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
     private fun fetchOffer(data: String) {
         val offer = Gson().fromJson(data, MessageOffer::class.java)
-        Log.i(TAG, "OFFER_RECEIVED")
+        Log.i(TAG, "OFFER_RECEIVED $offer")
         callback.onOffer(offer)
     }
 
     private fun fetchAnswer(data: String) {
         val answer = Gson().fromJson(data, MessageAnswer::class.java)
-        Log.i(TAG, "ANSWER_RECEIVED")
+        Log.i(TAG, "ANSWER_RECEIVED $answer")
         callback.onAnswer(answer)
     }
 
@@ -155,7 +157,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
 
     fun emitOffer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, offer: SessionDescription) {
-        Log.d(TAG,"emitOffer")
+        Log.d(TAG,"emitOffer ${offer.description}")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageOffer(
             type = SIGNAL_OFFER,
             time = System.currentTimeMillis(),

@@ -6,6 +6,7 @@ import android.os.HandlerThread
 import android.os.Looper
 import android.support.annotation.WorkerThread
 import android.util.Log
+import com.example.dev.webrtcclient.BaseCallService
 import com.example.dev.webrtcclient.BaseWebRTCManager
 import com.example.dev.webrtcclient.CustomPeerConnectionObserver
 import com.example.dev.webrtcclient.CustomSdpObserver
@@ -132,6 +133,8 @@ class DirectWebRTCManager(
 
         audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
         localAudioTrack = peerConnectionFactory.createAudioTrack("101", audioSource)
+
+//        localPeer.setBitrate()
     }
 
     private fun createPeerConnection() {
@@ -428,10 +431,13 @@ class DirectWebRTCManager(
 
     fun declineCall() {
         workerHandler.post {
+            Log.e(BaseCallService.TAG,"declineCall")
             callStateSubject.value?.also { state ->
                 try {
                     addEvent(SimpleEvent.OutMessage("Emit decline call"))
+                    Log.e(BaseCallService.TAG,"declineCall 1")
                     signalingManager.emitCallDecline(callInfo)
+                    Log.e(BaseCallService.TAG,"declineCall 2")
                     onDecline()
                 } catch (exc: Exception) {
                     onError("Failed decline call", exc)
@@ -531,7 +537,7 @@ class DirectWebRTCManager(
     @WorkerThread
     private fun emitAnswer(answer: SessionDescription) {
         signalingManager.emitAnswer(callInfo, answer)
-        setState(DirectCallState.CALL_RUNNING)
+//        setState(DirectCallState.CALL_RUNNING)
     }
 
     @WorkerThread

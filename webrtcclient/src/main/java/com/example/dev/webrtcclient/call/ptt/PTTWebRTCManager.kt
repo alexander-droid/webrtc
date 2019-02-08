@@ -217,18 +217,36 @@ class PTTWebRTCManager(
                 list.add(recipientInfo)
                 recipientsSubject.onNext(list)
             }
+
+            if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+                val callInfo = groupCallInfo
+                callInfo?:return@post
+//                signalingManager.emitStartTalking(callInfo.me)
+
+                val myPeer = MyPeerConnection(recipientInfo, true)
+                peerConnectionMap[recipientInfo.id] = myPeer
+                myPeer.createOffer()
+            }
         }
     }
 
     override fun onRecipientUnsubscribed(recipientInfo: CallUserInfo) {
+        Log.e("SignallingManager", "onRecipientUnsubscribed: $recipientInfo")
         workerHandler.post {
+            Log.e("SignallingManager", "onRecipientUnsubscribed: $recipientInfo")
             recipientRemovedSubject.onNext(recipientInfo)
             recipientsSubject.value?.also { list ->
+                Log.e("SignallingManager", "onRecipientUnsubscribed: remove ${list.size}")
                 list.remove(recipientInfo)
+                Log.e("SignallingManager", "onRecipientUnsubscribed: remove ${list.size}")
                 recipientsSubject.onNext(list)
             }
 
             peerConnectionMap.remove(recipientInfo.id)?.also { peer ->
+                if (callStateSubject.value?.state == GroupCallState.State.RECIPIENT_SPEAKING
+                    && callStateSubject.value?.lastSpeaker?.id == recipientInfo.id) {
+                    callStateSubject.onNext(GroupCallState.stoppedSpeaking(recipientInfo))
+                }
                 peer.release()
             }
         }
@@ -340,7 +358,8 @@ class PTTWebRTCManager(
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id == ice.data.to) {
+        if (callInfo.me.id == ice.data.to && (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING
+                    || callStateSubject.value?.state == GroupCallState.State.RECIPIENT_SPEAKING)) {
             return peerConnectionMap.contains(ice.data.from)
         }
 
@@ -439,24 +458,26 @@ class PTTWebRTCManager(
             it.value.release()
         }
         peerConnectionMap.clear()
-        workerHandler.removeCallbacksAndMessages(null)
     }
 
     fun release() {
-        workerHandler.post {
-            try {
-                recipientAddedSubject.onComplete()
-                recipientRemovedSubject.onComplete()
-                callStateSubject.onComplete()
-                recipientsSubject.onComplete()
-                signalingManager.disconnect()
-                releasePeers()
-                workerHandler.removeCallbacksAndMessages(null)
-                mainHandler.removeCallbacksAndMessages(null)
-                handlerThread.quit()
-            } catch (exc: Throwable) {
-                Log.e(TAG, "error", exc)
+        workerHandler.removeCallbacksAndMessages(null)
+        handlerThread.quitSafely()
+        try {
+            if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+                groupCallInfo?.also { callInfo ->
+                    signalingManager.emitStopTalking(callInfo.me)
+                }
             }
+            recipientAddedSubject.onComplete()
+            recipientRemovedSubject.onComplete()
+            callStateSubject.onComplete()
+            recipientsSubject.onComplete()
+
+            signalingManager.disconnect()
+            releasePeers()
+        } catch (exc: Throwable) {
+            Log.e(TAG, "error", exc)
         }
     }
 
@@ -495,6 +516,8 @@ class PTTWebRTCManager(
                     emitIceCandidate(userInfo, iceCandidate)
                 }
             })!!
+
+//            localPeer.setBitrate(10000, 11000, 12000)
 
             if (enableOutput) {
                 val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
@@ -611,7 +634,7 @@ class PTTWebRTCManager(
             Log.e("my_peer", "release ${userInfo.id}")
             try {
                 localPeer.dispose()
-            } catch (exc: Exception) {
+            } catch (exc: Throwable) {
                 Log.e("my_peer", "error while release peer", exc)
             }
         }

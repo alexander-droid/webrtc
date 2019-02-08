@@ -57,6 +57,7 @@
                         android:id="@+id/myNameEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:inputType="text"
                         android:text="bob10"
                         android:hint="My name">
 
@@ -89,6 +90,7 @@
                             android:id="@+id/opponentEditText"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:inputType="text"
                             android:text="bob"
                             android:hint="Recipient name or Group name">
 

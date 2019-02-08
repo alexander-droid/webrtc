@@ -106,9 +106,6 @@ class PTTCallActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pttcall)
 
-//        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-//        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
-
         audioToggle.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 callService?.startTalking()

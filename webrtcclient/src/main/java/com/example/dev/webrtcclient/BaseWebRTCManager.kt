@@ -2,11 +2,13 @@ package com.example.dev.webrtcclient
 
 import android.support.annotation.WorkerThread
 import android.util.Base64
+import android.webkit.WebResourceError
 import com.example.dev.webrtcclient.api.XirsysApi
 import com.example.dev.webrtcclient.model.response.TurnServer
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import org.webrtc.voiceengine.WebRtcAudioManager
+import org.webrtc.voiceengine.WebRtcAudioTrack
 import org.webrtc.voiceengine.WebRtcAudioUtils
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
@@ -25,6 +27,7 @@ abstract class BaseWebRTCManager {
     init {
         WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true)
         WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true)
+        WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true)
         WebRtcAudioManager.setStereoInput(true)
         WebRtcAudioManager.setStereoOutput(true)
     }

@@ -171,7 +171,7 @@ class PTTWebRTCManager(
     private fun createOffers(members: List<CallUserInfo>) {
         initInternal()
         members.forEach { userInfo ->
-            val sessionId = UUID.randomUUID().toString()
+            val sessionId = null/*UUID.randomUUID().toString()*/
             val myPeer = MyPeerConnection(userInfo, true, sessionId)
             peerConnectionMap[userInfo.id] = myPeer
             myPeer.createOffer(sessionId)
@@ -222,12 +222,12 @@ class PTTWebRTCManager(
             if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
                 val callInfo = groupCallInfo
                 callInfo?:return@post
-//                signalingManager.emitStartTalking(callInfo.me)
+                signalingManager.emitStartTalking(callInfo.me)
 
-                val sessionId = UUID.randomUUID().toString()
-                val myPeer = MyPeerConnection(recipientInfo, true, sessionId)
-                peerConnectionMap[recipientInfo.id] = myPeer
-                myPeer.createOffer(sessionId)
+//                val sessionId = null/*UUID.randomUUID().toString()*/
+//                val myPeer = MyPeerConnection(recipientInfo, true, sessionId)
+//                peerConnectionMap[recipientInfo.id] = myPeer
+//                myPeer.createOffer(sessionId)
             }
         }
     }
@@ -257,10 +257,12 @@ class PTTWebRTCManager(
         workerHandler.post {
             Log.e("my_peer", "onUserTalking ${recipient.id}, $isSpeaking")
             if (isSpeaking) {
+                Log.e("my_peer", "shouldAcceptUserStartSpeaking ${shouldAcceptUserStartSpeaking(recipient)}")
                 if (shouldAcceptUserStartSpeaking(recipient)) {
                     callStateSubject.onNext(GroupCallState.awaitingOffer(recipient))
                 }
             } else {
+                Log.e("my_peer", "shouldAcceptUserStopSpeaking ${shouldAcceptUserStopSpeaking(recipient)}")
                 if (shouldAcceptUserStopSpeaking(recipient)) {
                     releasePeers(recipient)
                 }
@@ -403,7 +405,7 @@ class PTTWebRTCManager(
 
 
     @WorkerThread
-    private fun emitIceCandidate(userInfo: CallUserInfo, ice: IceCandidate, sessionId: String) {
+    private fun emitIceCandidate(userInfo: CallUserInfo, ice: IceCandidate, sessionId: String?) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
@@ -417,7 +419,7 @@ class PTTWebRTCManager(
     }
 
     @WorkerThread
-    private fun emitOffer(userInfo: CallUserInfo, offer: SessionDescription, sessionId: String) {
+    private fun emitOffer(userInfo: CallUserInfo, offer: SessionDescription, sessionId: String?) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
@@ -431,7 +433,7 @@ class PTTWebRTCManager(
     }
 
     @WorkerThread
-    private fun emitAnswer(userInfo: CallUserInfo, answer: SessionDescription, sessionId: String) {
+    private fun emitAnswer(userInfo: CallUserInfo, answer: SessionDescription, sessionId: String?) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
@@ -527,7 +529,7 @@ class PTTWebRTCManager(
 
 
 
-    inner class MyPeerConnection(private val userInfo: CallUserInfo, private val enableOutput: Boolean, private val sessionId: String) {
+    inner class MyPeerConnection(private val userInfo: CallUserInfo, private val enableOutput: Boolean, private val sessionId: String?) {
 
         private lateinit var localPeer: PeerConnection
 
@@ -559,7 +561,7 @@ class PTTWebRTCManager(
             }
         }
 
-        fun createOffer(sessionId: String) {
+        fun createOffer(sessionId: String?) {
             Log.v("my_peer", "$sessionId, ${userInfo.id} createOffer: ${localPeer.signalingState()}")
             if (this.sessionId == sessionId) {
                 val sdpConstraints = MediaConstraints()
@@ -581,7 +583,7 @@ class PTTWebRTCManager(
             }
         }
 
-        fun createAnswer(sessionId: String) {
+        fun createAnswer(sessionId: String?) {
             Log.v("my_peer", "$sessionId, ${userInfo.id} createAnswer: ${localPeer.signalingState()}")
             if (localPeer.signalingState() == PeerConnection.SignalingState.HAVE_REMOTE_OFFER && this.sessionId == sessionId) {
                 localPeer.createAnswer(object : SdpObserver {
@@ -611,7 +613,7 @@ class PTTWebRTCManager(
 
 
 
-        fun addIceCandidate(ice: MessageIceCandidate, sessionId: String) {
+        fun addIceCandidate(ice: MessageIceCandidate, sessionId: String?) {
             Log.w("my_peer", "$sessionId, ${userInfo.id} addIceCandidate: ${localPeer.signalingState()}")
             if (this.sessionId == sessionId) {
                 ice.data.candidate?.also { candidate ->
@@ -621,7 +623,7 @@ class PTTWebRTCManager(
             }
         }
 
-        fun setOffer(offer: MessageOffer, sessionId: String) {
+        fun setOffer(offer: MessageOffer, sessionId: String?) {
             Log.w(TAG, "ON_OFFER setOffer")
             Log.d("my_peer", "$sessionId, ${userInfo.id} setOffer: ${localPeer.signalingState()}")
             if (localPeer.signalingState() == PeerConnection.SignalingState.STABLE && this.sessionId == sessionId) {
@@ -649,11 +651,12 @@ class PTTWebRTCManager(
             }
         }
 
-        fun setAnswer(answer: MessageAnswer, sessionId: String) {
+        fun setAnswer(answer: MessageAnswer, sessionId: String?) {
             Log.d("my_peer", "$sessionId, ${userInfo.id} setAnswer: ${localPeer.signalingState()}")
             if (localPeer.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER && this.sessionId == sessionId) {
                 localPeer.setRemoteDescription(object : SdpObserver {
                     override fun onSetFailure(s: String?) {
+                        Log.e("my_peer", "$sessionId, ${userInfo.id} onSetFailure: $s")
                         onError(s)
                     }
 

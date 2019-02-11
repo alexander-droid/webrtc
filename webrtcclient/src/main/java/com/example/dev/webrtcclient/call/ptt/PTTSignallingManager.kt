@@ -157,7 +157,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
 
 
-    fun emitOffer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, offer: SessionDescription, sessionId: String) {
+    fun emitOffer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, offer: SessionDescription, sessionId: String?) {
         val time = System.currentTimeMillis()
         Log.d(TAG,"emitOffer $time")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageOffer(
@@ -176,7 +176,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
         )))
     }
 
-    fun emitIceCandidate(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, ice: IceCandidate, sessionId: String) {
+    fun emitIceCandidate(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, ice: IceCandidate, sessionId: String?) {
         Log.d(TAG,"emitIceCandidate")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageIceCandidate(
             type = SIGNAL_ICE,
@@ -194,7 +194,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
         )))
     }
 
-    fun emitAnswer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, answer: SessionDescription, sessionId: String) {
+    fun emitAnswer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, answer: SessionDescription, sessionId: String?) {
         Log.d(TAG,"emitAnswer")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageAnswer(
             type = SIGNAL_ANSWER,

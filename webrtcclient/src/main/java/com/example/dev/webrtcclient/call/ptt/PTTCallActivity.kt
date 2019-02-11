@@ -84,6 +84,7 @@ class PTTCallActivity : BaseActivity() {
                                 talkingTextView.text = "You are speaking"
                                 audioToggle.isChecked = true
                             }
+                            GroupCallState.State.AWAITING_OFFER,
                             GroupCallState.State.RECIPIENT_SPEAKING -> {
                                 talkingTextView.visibility = View.VISIBLE
                                 talkingTextView.text = "${state.lastSpeaker?.name} is speaking"

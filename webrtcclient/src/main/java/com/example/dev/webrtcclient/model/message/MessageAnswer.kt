@@ -3,6 +3,7 @@ package com.example.dev.webrtcclient.model.message
 data class MessageAnswer(
     val type: String,
     val time: Long,
+    val sessionId: String,
     val data: Data
 ) {
     data class Data(

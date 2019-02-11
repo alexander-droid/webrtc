@@ -14,6 +14,7 @@ import com.pusher.client.channel.User
 import org.json.JSONObject
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
+import java.util.*
 
 class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
@@ -107,13 +108,13 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
     private fun fetchOffer(data: String) {
         val offer = Gson().fromJson(data, MessageOffer::class.java)
-        Log.i(TAG, "OFFER_RECEIVED $offer")
+        Log.i(TAG, "OFFER_RECEIVED")
         callback.onOffer(offer)
     }
 
     private fun fetchAnswer(data: String) {
         val answer = Gson().fromJson(data, MessageAnswer::class.java)
-        Log.i(TAG, "ANSWER_RECEIVED $answer")
+        Log.i(TAG, "ANSWER_RECEIVED ${answer.time}")
         callback.onAnswer(answer)
     }
 
@@ -156,11 +157,13 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
 
 
-    fun emitOffer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, offer: SessionDescription) {
-        Log.d(TAG,"emitOffer ${offer.description}")
+    fun emitOffer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, offer: SessionDescription, sessionId: String) {
+        val time = System.currentTimeMillis()
+        Log.d(TAG,"emitOffer $time")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageOffer(
             type = SIGNAL_OFFER,
-            time = System.currentTimeMillis(),
+            time = time,
+            sessionId = sessionId,
             data = MessageOffer.Data(
                 from = callInfo.me.id,
                 to = recipientInfo.id,
@@ -173,11 +176,12 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
         )))
     }
 
-    fun emitIceCandidate(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, ice: IceCandidate) {
+    fun emitIceCandidate(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, ice: IceCandidate, sessionId: String) {
         Log.d(TAG,"emitIceCandidate")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageIceCandidate(
             type = SIGNAL_ICE,
             time = System.currentTimeMillis(),
+            sessionId = sessionId,
             data = MessageIceCandidate.Data(
                 from = callInfo.me.id,
                 to = recipientInfo.id,
@@ -190,11 +194,12 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
         )))
     }
 
-    fun emitAnswer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, answer: SessionDescription) {
+    fun emitAnswer(callInfo: GroupCallInfo, recipientInfo: CallUserInfo, answer: SessionDescription, sessionId: String) {
         Log.d(TAG,"emitAnswer")
         groupChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageAnswer(
             type = SIGNAL_ANSWER,
             time = System.currentTimeMillis(),
+            sessionId = sessionId,
             data = MessageAnswer.Data(
                 from = callInfo.me.id,
                 to = recipientInfo.id,
@@ -270,7 +275,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
 
     interface Callback {
-        fun onError(message: String?, exception: Exception? = null, leave: Boolean = false)
+        fun onError(message: String?, exception: Exception? = null, leave: Boolean = false, disconnect: Boolean = false)
         fun onRecipientsInformationReceived(recipientInfoList: MutableList<CallUserInfo>)
         fun onRecipientSubscribed(recipientInfo: CallUserInfo)
         fun onRecipientUnsubscribed(recipientInfo: CallUserInfo)

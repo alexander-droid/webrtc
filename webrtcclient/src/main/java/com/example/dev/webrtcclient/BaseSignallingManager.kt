@@ -79,9 +79,13 @@ abstract class BaseSignallingManager {
 
             override fun onError(message: String?, code: String?, e: Exception?) {
                 Log.e(TAG, "Pusher connection error: $message", e)
+                onPusherConnectionError(message)
             }
-
         })
+    }
+
+    protected open fun onPusherConnectionError(message: String?) {
+
     }
 
     @CallSuper

@@ -21,6 +21,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
 import org.webrtc.*
+import java.util.*
 
 class PTTWebRTCManager(
     private val context: Context,
@@ -170,23 +171,23 @@ class PTTWebRTCManager(
     private fun createOffers(members: List<CallUserInfo>) {
         initInternal()
         members.forEach { userInfo ->
-            val myPeer = MyPeerConnection(userInfo, true)
+            val sessionId = UUID.randomUUID().toString()
+            val myPeer = MyPeerConnection(userInfo, true, sessionId)
             peerConnectionMap[userInfo.id] = myPeer
-        }
-
-        peerConnectionMap.forEach {
-            it.value.createOffer()
+            myPeer.createOffer(sessionId)
         }
     }
 
     fun stopTalking() {
         workerHandler.post {
             try {
-                if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
-                    val callInfo = groupCallInfo
-                    callInfo?:return@post
-                    signalingManager.emitStopTalking(callInfo.me)
-                    releasePeers(callInfo.me)
+                callStateSubject.value?.state?.also { state ->
+                    if (state == GroupCallState.State.ME_SPEAKING) {
+                        val callInfo = groupCallInfo
+                        callInfo?:return@post
+                        signalingManager.emitStopTalking(callInfo.me)
+                        releasePeers(callInfo.me)
+                    }
                 }
             } catch (exc: Exception) {
                 onError("Error while releasing peers", exc)
@@ -223,9 +224,10 @@ class PTTWebRTCManager(
                 callInfo?:return@post
 //                signalingManager.emitStartTalking(callInfo.me)
 
-                val myPeer = MyPeerConnection(recipientInfo, true)
+                val sessionId = UUID.randomUUID().toString()
+                val myPeer = MyPeerConnection(recipientInfo, true, sessionId)
                 peerConnectionMap[recipientInfo.id] = myPeer
-                myPeer.createOffer()
+                myPeer.createOffer(sessionId)
             }
         }
     }
@@ -233,7 +235,6 @@ class PTTWebRTCManager(
     override fun onRecipientUnsubscribed(recipientInfo: CallUserInfo) {
         Log.e("SignallingManager", "onRecipientUnsubscribed: $recipientInfo")
         workerHandler.post {
-            Log.e("SignallingManager", "onRecipientUnsubscribed: $recipientInfo")
             recipientRemovedSubject.onNext(recipientInfo)
             recipientsSubject.value?.also { list ->
                 Log.e("SignallingManager", "onRecipientUnsubscribed: remove ${list.size}")
@@ -254,9 +255,15 @@ class PTTWebRTCManager(
 
     override fun onUserTalking(recipient: CallUserInfo, isSpeaking: Boolean) {
         workerHandler.post {
-            Log.w("rioferu", "onUserTalking: $isSpeaking")
-            if (!isSpeaking && shouldAcceptUserStopSpeaking(recipient)) {
-                releasePeers(recipient)
+            Log.e("my_peer", "onUserTalking ${recipient.id}, $isSpeaking")
+            if (isSpeaking) {
+                if (shouldAcceptUserStartSpeaking(recipient)) {
+                    callStateSubject.onNext(GroupCallState.awaitingOffer(recipient))
+                }
+            } else {
+                if (shouldAcceptUserStopSpeaking(recipient)) {
+                    releasePeers(recipient)
+                }
             }
         }
     }
@@ -265,16 +272,17 @@ class PTTWebRTCManager(
         workerHandler.post {
             val callInfo = groupCallInfo
             callInfo?:return@post
+            Log.e("my_peer", "onOffer ${offer.sessionId}, ${shouldAcceptOffer(offer)}")
             if (shouldAcceptOffer(offer)) {
                 signalingManager.getGroupMembers(callInfo).also { members ->
                     members.forEach { member ->
-                        if (member.id == offer.data.from) {
+                        if (member.id == offer.data.from) { //only for initiator
                             Log.w(TAG, "ON_OFFER ${offer.data.from}->${offer.data.to} ${offer.data.description}")
                             callStateSubject.onNext(GroupCallState.recipientSpeaking(member))
                             initInternal()
-                            val myPeer = MyPeerConnection(member, false)
+                            val myPeer = MyPeerConnection(member, false, offer.sessionId)
                             peerConnectionMap[member.id] = myPeer
-                            myPeer.setOffer(offer)
+                            myPeer.setOffer(offer, offer.sessionId)
 
                             Log.d("rioferu", "onOffer: ${member.id}")
                             return@also
@@ -287,12 +295,13 @@ class PTTWebRTCManager(
 
     override fun onAnswer(answer: MessageAnswer) {
         workerHandler.post {
+            Log.e("my_peer", "onAnswer ${answer.sessionId}, ${shouldAcceptAnswer(answer)}")
             if (shouldAcceptAnswer(answer)) {
                 val callInfo = groupCallInfo
                 callInfo?:return@post
                 peerConnectionMap[answer.data.from]?.also { peer ->
                     Log.w(TAG, "ON_ANSWER ${answer.data.from}->${answer.data.to} ${answer.data.description}")
-                    peer.setAnswer(answer)
+                    peer.setAnswer(answer, answer.sessionId)
                 }
             }
         }
@@ -305,7 +314,7 @@ class PTTWebRTCManager(
                 callInfo?:return@post
                 peerConnectionMap[ice.data.from]?.also { peer ->
                     Log.w(TAG, "ON_ICE ${ice.data.from}->${ice.data.to} ${ice.data.candidate}")
-                    peer.addIceCandidate(ice)
+                    peer.addIceCandidate(ice, ice.sessionId)
                 }
             }
         }
@@ -317,16 +326,29 @@ class PTTWebRTCManager(
 
 
 
+    private fun shouldAcceptUserStartSpeaking(recipient: CallUserInfo): Boolean {
+        val callInfo = groupCallInfo
+        callInfo?:return false
 
+        callStateSubject.value?.state?.also { state ->
+            if (callInfo.me.id != recipient.id && state >= GroupCallState.State.NONE) {
+                return true
+            }
+        }
+
+        return false
+    }
 
     private fun shouldAcceptUserStopSpeaking(recipient: CallUserInfo): Boolean {
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id != recipient.id
-            && callStateSubject.value?.state == GroupCallState.State.RECIPIENT_SPEAKING
-            && callStateSubject.value?.lastSpeaker?.id == recipient.id) {
-            return true
+        callStateSubject.value?.state?.also { state ->
+            if (callInfo.me.id != recipient.id
+                && state >= GroupCallState.State.AWAITING_OFFER
+                && callStateSubject.value?.lastSpeaker?.id == recipient.id) {
+                return true
+            }
         }
 
         return false
@@ -336,8 +358,12 @@ class PTTWebRTCManager(
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id == offer.data.to && callStateSubject.value?.state == GroupCallState.State.NONE) {
-            return true
+        callStateSubject.value?.state?.also { state ->
+            if (callInfo.me.id == offer.data.to
+                && state == GroupCallState.State.AWAITING_OFFER
+                && callStateSubject.value?.lastSpeaker?.id == offer.data.from) {
+                return true
+            }
         }
 
         return false
@@ -358,9 +384,10 @@ class PTTWebRTCManager(
         val callInfo = groupCallInfo
         callInfo?:return false
 
-        if (callInfo.me.id == ice.data.to && (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING
-                    || callStateSubject.value?.state == GroupCallState.State.RECIPIENT_SPEAKING)) {
-            return peerConnectionMap.contains(ice.data.from)
+        callStateSubject.value?.state?.also { state ->
+            if (callInfo.me.id == ice.data.to && state >= GroupCallState.State.AWAITING_OFFER) {
+                return peerConnectionMap.contains(ice.data.from)
+            }
         }
 
         return false
@@ -376,12 +403,12 @@ class PTTWebRTCManager(
 
 
     @WorkerThread
-    private fun emitIceCandidate(userInfo: CallUserInfo, ice: IceCandidate) {
+    private fun emitIceCandidate(userInfo: CallUserInfo, ice: IceCandidate, sessionId: String) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
                     Log.v(TAG, "emitIceCandidate ${userInfo.id}")
-                    signalingManager.emitIceCandidate(callInfo, userInfo, ice)
+                    signalingManager.emitIceCandidate(callInfo, userInfo, ice, sessionId)
                 }
             } catch (exc: Exception) {
                 onError("Failed emitting ice candidate", exc)
@@ -390,12 +417,12 @@ class PTTWebRTCManager(
     }
 
     @WorkerThread
-    private fun emitOffer(userInfo: CallUserInfo, offer: SessionDescription) {
+    private fun emitOffer(userInfo: CallUserInfo, offer: SessionDescription, sessionId: String) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
                     Log.v(TAG, "emitOffer ${userInfo.id}")
-                    signalingManager.emitOffer(callInfo, userInfo, offer)
+                    signalingManager.emitOffer(callInfo, userInfo, offer, sessionId)
                 }
             } catch (exc: Exception) {
                 onError("Failed sending offer", exc)
@@ -404,12 +431,12 @@ class PTTWebRTCManager(
     }
 
     @WorkerThread
-    private fun emitAnswer(userInfo: CallUserInfo, answer: SessionDescription) {
+    private fun emitAnswer(userInfo: CallUserInfo, answer: SessionDescription, sessionId: String) {
         workerHandler.post {
             try {
                 groupCallInfo?.also { callInfo ->
                     Log.v(TAG, "emitAnswer ${userInfo.id}")
-                    signalingManager.emitAnswer(callInfo, userInfo, answer)
+                    signalingManager.emitAnswer(callInfo, userInfo, answer, sessionId)
                 }
             } catch (exc: Exception) {
                 onError("Failed sending answer", exc)
@@ -428,7 +455,7 @@ class PTTWebRTCManager(
 
 
 
-    override fun onError(message: String?, exception: Exception?, leave: Boolean) {
+    override fun onError(message: String?, exception: Exception?, leave: Boolean, disconnect: Boolean) {
         workerHandler.post {
             Log.e(TAG, message, exception)
             message?.also {
@@ -500,7 +527,7 @@ class PTTWebRTCManager(
 
 
 
-    inner class MyPeerConnection(private val userInfo: CallUserInfo, private val enableOutput: Boolean) {
+    inner class MyPeerConnection(private val userInfo: CallUserInfo, private val enableOutput: Boolean, private val sessionId: String) {
 
         private lateinit var localPeer: PeerConnection
 
@@ -512,10 +539,12 @@ class PTTWebRTCManager(
             localPeer = peerConnectionFactory.createPeerConnection(rtcConfig, object : CustomPeerConnectionObserver("localPeerCreation") {
                 override fun onIceCandidate(iceCandidate: IceCandidate) {
                     super.onIceCandidate(iceCandidate)
-                    Log.v("my_peer", "${userInfo.id} iceCandidateCreated")
-                    emitIceCandidate(userInfo, iceCandidate)
+                    Log.v("my_peer", "$sessionId, ${userInfo.id} iceCandidateCreated: ${localPeer.signalingState()}")
+                    emitIceCandidate(userInfo, iceCandidate, this@MyPeerConnection.sessionId)
                 }
             })!!
+
+            Log.e("my_peer", "$sessionId, ${userInfo.id} createPeerConnection: ${localPeer.signalingState()}")
 
 //            localPeer.setBitrate(10000, 11000, 12000)
 
@@ -530,110 +559,123 @@ class PTTWebRTCManager(
             }
         }
 
-        fun createOffer() {
-            Log.v("my_peer", "${userInfo.id} createOffer")
-            val sdpConstraints = MediaConstraints()
-            sdpConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
-            localPeer.createOffer(object : SdpObserver {
-                override fun onCreateSuccess(sessionDescription: SessionDescription) {
-                    Log.v("my_peer", "${userInfo.id} createOfferSuccess")
-                    localPeer.setLocalDescription(CustomSdpObserver("localSetLocalDesc"), sessionDescription)
-                    emitOffer(userInfo, sessionDescription)
-                }
+        fun createOffer(sessionId: String) {
+            Log.v("my_peer", "$sessionId, ${userInfo.id} createOffer: ${localPeer.signalingState()}")
+            if (this.sessionId == sessionId) {
+                val sdpConstraints = MediaConstraints()
+                sdpConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+                localPeer.createOffer(object : SdpObserver {
+                    override fun onCreateSuccess(sessionDescription: SessionDescription) {
+                        Log.v("my_peer", "$sessionId, ${userInfo.id} createOfferSuccess: ${localPeer.signalingState()}")
+                        localPeer.setLocalDescription(CustomSdpObserver("localSetLocalDesc"), sessionDescription)
+                        emitOffer(userInfo, sessionDescription, this@MyPeerConnection.sessionId)
+                    }
 
-                override fun onCreateFailure(s: String) {
-                    onError(s)
-                }
+                    override fun onCreateFailure(s: String) {
+                        onError(s)
+                    }
 
-                override fun onSetFailure(s: String) {}
-                override fun onSetSuccess() {}
-            }, sdpConstraints)
-        }
-
-        fun createAnswer() {
-            Log.v("my_peer", "${userInfo.id} createAnswer")
-            localPeer.createAnswer(object : SdpObserver {
-
-                override fun onCreateSuccess(sdp: SessionDescription) {
-                    Log.v("my_peer", "${userInfo.id} createAnswerSuccess")
-                    localPeer.setLocalDescription(CustomSdpObserver("localSetLocal"), sdp)
-                    emitAnswer(userInfo, sdp)
-                }
-
-                override fun onCreateFailure(s: String?) {
-                    onError(s)
-                }
-
-                override fun onSetFailure(s: String?) {}
-                override fun onSetSuccess() {}
-            }, MediaConstraints())
-        }
-
-
-
-
-
-
-
-
-
-
-        fun addIceCandidate(ice: MessageIceCandidate) {
-            Log.w("my_peer", "${userInfo.id} addIceCandidate")
-            ice.data.candidate?.also { candidate ->
-                localPeer.addIceCandidate(IceCandidate(candidate.sdpMid, ice.data.candidate.sdpMLineIndex, candidate.candidate))
+                    override fun onSetFailure(s: String) {}
+                    override fun onSetSuccess() {}
+                }, sdpConstraints)
             }
         }
 
-        fun setOffer(offer: MessageOffer) {
-            Log.w(TAG, "ON_OFFER setOffer")
-            Log.d("my_peer", "${userInfo.id} setOffer")
-            localPeer.setRemoteDescription(object : SdpObserver {
-                override fun onSetFailure(s: String?) {
-                    onError(s)
-                }
+        fun createAnswer(sessionId: String) {
+            Log.v("my_peer", "$sessionId, ${userInfo.id} createAnswer: ${localPeer.signalingState()}")
+            if (localPeer.signalingState() == PeerConnection.SignalingState.HAVE_REMOTE_OFFER && this.sessionId == sessionId) {
+                localPeer.createAnswer(object : SdpObserver {
 
-                override fun onSetSuccess() {
-                    Log.d("my_peer", "${userInfo.id} setOfferSuccess")
-                    workerHandler.post {
-                        try {
-                            createAnswer()
-                        } catch (exc: Exception) {
-                            onError("Failed creating answer", exc)
-                        }
+                    override fun onCreateSuccess(sdp: SessionDescription) {
+                        Log.v("my_peer", "$sessionId, ${userInfo.id} createAnswerSuccess: ${localPeer.signalingState()}")
+                        localPeer.setLocalDescription(CustomSdpObserver("localSetLocal"), sdp)
+                        emitAnswer(userInfo, sdp, this@MyPeerConnection.sessionId)
                     }
-                }
 
-                override fun onCreateSuccess(sdp: SessionDescription) {}
-                override fun onCreateFailure(s: String?) {}
+                    override fun onCreateFailure(s: String?) {
+                        onError(s)
+                    }
 
-            }, SessionDescription(SessionDescription.Type.OFFER, offer.data.description.sdp))
+                    override fun onSetFailure(s: String?) {}
+                    override fun onSetSuccess() {}
+                }, MediaConstraints())
+            }
         }
 
-        fun setAnswer(answer: MessageAnswer) {
-            Log.d("my_peer", "${userInfo.id} setAnswer")
-            localPeer.setRemoteDescription(object : SdpObserver {
-                override fun onSetFailure(s: String?) {
-                    onError(s)
+
+
+
+
+
+
+
+
+
+        fun addIceCandidate(ice: MessageIceCandidate, sessionId: String) {
+            Log.w("my_peer", "$sessionId, ${userInfo.id} addIceCandidate: ${localPeer.signalingState()}")
+            if (this.sessionId == sessionId) {
+                ice.data.candidate?.also { candidate ->
+                    localPeer.addIceCandidate(IceCandidate(candidate.sdpMid, ice.data.candidate.sdpMLineIndex, candidate.candidate))
+                    Log.w("my_peer", "$sessionId, ${userInfo.id} addIceCandidate2: ${localPeer.signalingState()}")
                 }
+            }
+        }
 
-                override fun onSetSuccess() {
-                    Log.d("my_peer", "${userInfo.id} setAnswerSuccess")
-                    workerHandler.post {
-
+        fun setOffer(offer: MessageOffer, sessionId: String) {
+            Log.w(TAG, "ON_OFFER setOffer")
+            Log.d("my_peer", "$sessionId, ${userInfo.id} setOffer: ${localPeer.signalingState()}")
+            if (localPeer.signalingState() == PeerConnection.SignalingState.STABLE && this.sessionId == sessionId) {
+                localPeer.setRemoteDescription(object : SdpObserver {
+                    override fun onSetFailure(s: String?) {
+                        onError(s)
                     }
-                }
 
-                override fun onCreateSuccess(sdp: SessionDescription) {}
-                override fun onCreateFailure(s: String?) {}
-            }, SessionDescription(SessionDescription.Type.fromCanonicalForm(answer.type.toLowerCase()), answer.data.description.sdp))
+                    override fun onSetSuccess() {
+                        Log.d("my_peer", "$sessionId, ${userInfo.id} setOfferSuccess: ${localPeer.signalingState()}")
+                        workerHandler.post {
+                            try {
+                                createAnswer(this@MyPeerConnection.sessionId)
+                            } catch (exc: Exception) {
+                                onError("Failed creating answer", exc)
+                            }
+                        }
+                    }
+
+                    override fun onCreateSuccess(sdp: SessionDescription) {}
+                    override fun onCreateFailure(s: String?) {}
+
+                }, SessionDescription(SessionDescription.Type.OFFER, offer.data.description.sdp))
+                Log.d("my_peer", "$sessionId, ${userInfo.id} setOffer2: ${localPeer.signalingState()}")
+            }
+        }
+
+        fun setAnswer(answer: MessageAnswer, sessionId: String) {
+            Log.d("my_peer", "$sessionId, ${userInfo.id} setAnswer: ${localPeer.signalingState()}")
+            if (localPeer.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER && this.sessionId == sessionId) {
+                localPeer.setRemoteDescription(object : SdpObserver {
+                    override fun onSetFailure(s: String?) {
+                        onError(s)
+                    }
+
+                    override fun onSetSuccess() {
+                        Log.d("my_peer", "$sessionId, ${userInfo.id} setAnswerSuccess: ${localPeer.signalingState()}")
+                        workerHandler.post {
+
+                        }
+                    }
+
+                    override fun onCreateSuccess(sdp: SessionDescription) {}
+                    override fun onCreateFailure(s: String?) {}
+                }, SessionDescription(SessionDescription.Type.fromCanonicalForm(answer.type.toLowerCase()), answer.data.description.sdp))
+                Log.d("my_peer", "$sessionId, ${userInfo.id} setAnswer2: ${localPeer.signalingState()}")
+            }
         }
 
         fun release() {
             Log.e(TAG, "release ${userInfo.id}")
-            Log.e("my_peer", "release ${userInfo.id}")
+            Log.e("my_peer", "release ${userInfo.id}: ${localPeer.signalingState()}, $sessionId")
             try {
-                localPeer.dispose()
+                localPeer.close()
             } catch (exc: Throwable) {
                 Log.e("my_peer", "error while release peer", exc)
             }

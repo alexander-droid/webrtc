@@ -27,6 +27,7 @@ import org.webrtc.SessionDescription
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.*
 
 class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() {
 
@@ -239,6 +240,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageOffer(
             type = SIGNAL_OFFER,
             time = System.currentTimeMillis(),
+            sessionId = UUID.randomUUID().toString(),//TODO
             data = MessageOffer.Data(
                 from = callInfo.me.id,
                 to = callInfo.recipient.id,
@@ -256,6 +258,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageIceCandidate(
             type = SIGNAL_ICE,
             time = System.currentTimeMillis(),
+            sessionId = UUID.randomUUID().toString(),//TODO
             data = MessageIceCandidate.Data(
                 from = callInfo.me.id,
                 to = callInfo.recipient.id,
@@ -273,6 +276,7 @@ class DirectSignallingManager(var callback: Callback) : BaseSignallingManager() 
         presenceChannel?.trigger(EVENT_CLIENT_RTC, Gson().toJson(MessageAnswer(
             type = SIGNAL_ANSWER,
             time = System.currentTimeMillis(),
+            sessionId = UUID.randomUUID().toString(),//TODO
             data = MessageAnswer.Data(
                 from = callInfo.me.id,
                 to = callInfo.recipient.id,

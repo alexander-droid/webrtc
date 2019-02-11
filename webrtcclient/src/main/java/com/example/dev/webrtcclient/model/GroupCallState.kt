@@ -4,10 +4,11 @@ data class GroupCallState(
     var state: State,
     var lastSpeaker: CallUserInfo? = null
 ) {
-    enum class State {
-        NONE,
-        ME_SPEAKING,
-        RECIPIENT_SPEAKING
+    enum class State(value: Int) {
+        NONE(0),
+        AWAITING_OFFER(1),
+        ME_SPEAKING(2),
+        RECIPIENT_SPEAKING(2)
     }
 
     companion object {
@@ -25,6 +26,10 @@ data class GroupCallState(
 
         fun stoppedSpeaking(userInfo: CallUserInfo): GroupCallState {
             return GroupCallState(State.NONE, userInfo)
+        }
+
+        fun awaitingOffer(userInfo: CallUserInfo): GroupCallState {
+            return GroupCallState(State.AWAITING_OFFER, userInfo)
         }
     }
 }

@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.example.dev.webrtcclient.BaseCallService
+import com.example.dev.webrtcclient.call.direct.DirectCallNotificationHelper
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.GroupCallInfo
 import com.example.dev.webrtcclient.model.GroupCallState
@@ -16,6 +17,8 @@ import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 
 class PTTCallService : BaseCallService(), PTTWebRTCManager.Callback {
+
+    private lateinit var callNotificationHelper: DirectCallNotificationHelper
 
     private var callInfo: GroupCallInfo? = null
 
@@ -40,7 +43,7 @@ class PTTCallService : BaseCallService(), PTTWebRTCManager.Callback {
 
     override fun onCreate() {
         super.onCreate()
-
+        callNotificationHelper = DirectCallNotificationHelper(this)
         webRTCManager = PTTWebRTCManager(this, this)
     }
 

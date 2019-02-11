@@ -2,7 +2,6 @@ package com.example.dev.webrtcclient.call.direct
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.ToneGenerator
@@ -24,10 +23,6 @@ import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import org.webrtc.EglBase
 import org.webrtc.VideoTrack
-import java.lang.reflect.Array.getLength
-import android.content.res.AssetFileDescriptor
-import com.example.dev.webrtcclient.R
-import java.io.IOException
 
 
 class DirectCallService : BaseCallService(), DirectWebRTCManager.Callback {

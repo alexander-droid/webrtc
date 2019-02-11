@@ -25,9 +25,9 @@ abstract class BaseWebRTCManager {
         .create(XirsysApi::class.java)
 
     init {
-        WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true)
-        WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true)
-        WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true)
+//        WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true)
+//        WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true)
+//        WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true)
         WebRtcAudioManager.setStereoInput(true)
         WebRtcAudioManager.setStereoOutput(true)
     }

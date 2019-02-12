@@ -16,6 +16,10 @@ abstract class BaseCallService: Service() {
 
     private lateinit var focusRequest: AudioFocusRequest
 
+    private var wasMicrophoneMute = false
+    private var wasSpeakerphoneOn = false
+    private var prevAudioMode = 0
+
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         var typeOfChange = "AUDIOFOCUS_NOT_DEFINED"
         typeOfChange = when (focusChange) {
@@ -34,6 +38,10 @@ abstract class BaseCallService: Service() {
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        wasMicrophoneMute = audioManager.isMicrophoneMute
+        wasSpeakerphoneOn = audioManager.isMicrophoneMute
+        prevAudioMode = audioManager.mode
+
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         audioManager.isMicrophoneMute = false
         audioManager.isSpeakerphoneOn = true
@@ -57,6 +65,9 @@ abstract class BaseCallService: Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        audioManager.mode = prevAudioMode
+        audioManager.isMicrophoneMute = wasMicrophoneMute
+        audioManager.isSpeakerphoneOn = wasSpeakerphoneOn
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(focusRequest)
         } else {

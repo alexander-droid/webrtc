@@ -16,13 +16,17 @@ import com.example.dev.webrtcclient.BaseActivity
 import com.example.dev.webrtcclient.R
 import com.example.dev.webrtcclient.model.GroupCallState
 import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.activity_pttcall.*
+import java.io.File
 
 class PTTCallActivity : BaseActivity() {
 
     private var disposable: CompositeDisposable? = null
 
     private var callService: PTTCallService? = null
+
+    private var audioPlaybackManager: AudioPlaybackManager? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -100,6 +104,27 @@ class PTTCallActivity : BaseActivity() {
                         showMessage(it, anchor = button_leave)
                     }
             )
+
+            disposable?.add(
+                service.audioRecordObservable
+                    .subscribe {
+                        showAudioView(it)
+                    }
+            )
+        }
+    }
+
+    private fun showAudioView(audioFile: File) {
+        audioView.visibility = View.VISIBLE
+
+        audioPlaybackManager?.also { playbackManager ->
+            disposable?.add(audioView.subscribe(audioFile, playbackManager.playback))
+
+            disposable?.add(audioView.onAudioProgressChanged
+                .subscribe { playbackManager.seekTo(it) })
+
+            disposable?.add(audioView.onEventClicked
+                .subscribe { playbackManager.processEvent(it) })
         }
     }
 
@@ -123,15 +148,16 @@ class PTTCallActivity : BaseActivity() {
     override fun onResume() {
         super.onResume()
         disposable = CompositeDisposable()
+        audioPlaybackManager = AudioPlaybackManager(this)
         bindService(Intent(this, PTTCallService::class.java), serviceConnection, Context.BIND_IMPORTANT)
     }
 
     override fun onPause() {
         super.onPause()
+        audioPlaybackManager?.release()
         disposable?.dispose()
         disposable = null
         unbindService(serviceConnection)
-
     }
 
     override fun onBackPressed() {

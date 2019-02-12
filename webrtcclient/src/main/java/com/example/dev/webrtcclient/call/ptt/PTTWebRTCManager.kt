@@ -9,6 +9,7 @@ import android.util.Log
 import com.example.dev.webrtcclient.BaseWebRTCManager
 import com.example.dev.webrtcclient.CustomPeerConnectionObserver
 import com.example.dev.webrtcclient.CustomSdpObserver
+import com.example.dev.webrtcclient.call.RecordedAudioToFileController
 import com.example.dev.webrtcclient.model.CallUserInfo
 import com.example.dev.webrtcclient.model.GroupCallInfo
 import com.example.dev.webrtcclient.model.GroupCallState
@@ -21,7 +22,8 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
 import org.webrtc.*
-import java.util.*
+import org.webrtc.audio.JavaAudioDeviceModule
+import java.io.File
 
 class PTTWebRTCManager(
     private val context: Context,
@@ -53,6 +55,10 @@ class PTTWebRTCManager(
     val messageObservable: Observable<String>
         get() = messageSubject.observeOn(AndroidSchedulers.mainThread())
 
+    private val audioRecordSubject = PublishSubject.create<File>()
+    val audioRecordObservable: Observable<File>
+        get() = audioRecordSubject.observeOn(AndroidSchedulers.mainThread())
+
     private var groupCallInfo: GroupCallInfo? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -67,6 +73,8 @@ class PTTWebRTCManager(
     private val peerIceServers = mutableListOf<PeerConnection.IceServer>()
     private lateinit var rootEglBase: EglBase
     lateinit var peerConnectionFactory: PeerConnectionFactory
+
+    private var saveRecordedAudioToFile: RecordedAudioToFileController? = null
 
     init {
         handlerThread.start()
@@ -108,7 +116,46 @@ class PTTWebRTCManager(
             .createInitializationOptions()
         PeerConnectionFactory.initialize(initializationOptions)
 
-        peerConnectionFactory = PeerConnectionFactory.builder().createPeerConnectionFactory()
+        saveRecordedAudioToFile = RecordedAudioToFileController(workerHandler)
+//                WebRtcAudioRecord.setOnAudioSamplesReady(saveRecordedAudioToFile)
+
+        val audioDevice = JavaAudioDeviceModule.builder(context)
+            .setSamplesReadyCallback(saveRecordedAudioToFile)
+            .setUseHardwareAcousticEchoCanceler(true)
+            .setUseHardwareNoiseSuppressor(true)
+            .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
+                override fun onWebRtcAudioRecordInitError(message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioRecordInitError $message")
+                }
+
+                override fun onWebRtcAudioRecordError(message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioRecordError $message")
+                }
+
+                override fun onWebRtcAudioRecordStartError(code: JavaAudioDeviceModule.AudioRecordStartErrorCode?, message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioRecordStartError $message")
+                }
+
+            })
+            .setAudioTrackErrorCallback(object : JavaAudioDeviceModule.AudioTrackErrorCallback {
+                override fun onWebRtcAudioTrackError(message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioTrackError $message")
+                }
+
+                override fun onWebRtcAudioTrackStartError(code: JavaAudioDeviceModule.AudioTrackStartErrorCode?, message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioTrackStartError $message")
+                }
+
+                override fun onWebRtcAudioTrackInitError(message: String?) {
+                    Log.e("MyAudioRecord", "onWebRtcAudioTrackInitError $message")
+                }
+
+            })
+            .createAudioDeviceModule()
+
+        peerConnectionFactory = PeerConnectionFactory.builder()
+            .setAudioDeviceModule(audioDevice)
+            .createPeerConnectionFactory()
 
         rtcConfig = PeerConnection.RTCConfiguration(peerIceServers)
         // TCP candidates are only useful when connecting to a server that supports
@@ -186,6 +233,11 @@ class PTTWebRTCManager(
                         val callInfo = groupCallInfo
                         callInfo?:return@post
                         signalingManager.emitStopTalking(callInfo.me)
+                        saveRecordedAudioToFile?.stop()
+                        saveRecordedAudioToFile?.outputFile?.also { file ->
+                            audioRecordSubject.onNext(file)
+                        }
+                        saveRecordedAudioToFile?.clean()
                         releasePeers(callInfo.me)
                     }
                 }
@@ -297,6 +349,7 @@ class PTTWebRTCManager(
 
     override fun onAnswer(answer: MessageAnswer) {
         workerHandler.post {
+            saveRecordedAudioToFile?.start()
             Log.e("my_peer", "onAnswer ${answer.sessionId}, ${shouldAcceptAnswer(answer)}")
             if (shouldAcceptAnswer(answer)) {
                 val callInfo = groupCallInfo
@@ -490,23 +543,26 @@ class PTTWebRTCManager(
     }
 
     fun release() {
-        workerHandler.removeCallbacksAndMessages(null)
-        handlerThread.quitSafely()
-        try {
-            if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
-                groupCallInfo?.also { callInfo ->
-                    signalingManager.emitStopTalking(callInfo.me)
+        workerHandler.post {
+            try {
+                if (callStateSubject.value?.state == GroupCallState.State.ME_SPEAKING) {
+                    groupCallInfo?.also { callInfo ->
+                        signalingManager.emitStopTalking(callInfo.me)
+                    }
                 }
-            }
-            recipientAddedSubject.onComplete()
-            recipientRemovedSubject.onComplete()
-            callStateSubject.onComplete()
-            recipientsSubject.onComplete()
+                recipientAddedSubject.onComplete()
+                recipientRemovedSubject.onComplete()
+                callStateSubject.onComplete()
+                recipientsSubject.onComplete()
 
-            signalingManager.disconnect()
-            releasePeers()
-        } catch (exc: Throwable) {
-            Log.e(TAG, "error", exc)
+                signalingManager.disconnect()
+                releasePeers()
+
+                workerHandler.removeCallbacksAndMessages(null)
+                handlerThread.quitSafely()
+            } catch (exc: Throwable) {
+                Log.e(TAG, "error", exc)
+            }
         }
     }
 
@@ -549,7 +605,6 @@ class PTTWebRTCManager(
             Log.e("my_peer", "$sessionId, ${userInfo.id} createPeerConnection: ${localPeer.signalingState()}")
 
 //            localPeer.setBitrate(10000, 11000, 12000)
-
             if (enableOutput) {
                 val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
                 val localAudioTrack = peerConnectionFactory.createAudioTrack("101", audioSource)

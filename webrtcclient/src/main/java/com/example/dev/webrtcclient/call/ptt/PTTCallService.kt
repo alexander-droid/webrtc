@@ -15,6 +15,7 @@ import com.example.dev.webrtcclient.model.GroupCallInfo
 import com.example.dev.webrtcclient.model.GroupCallState
 import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
+import java.io.File
 
 class PTTCallService : BaseCallService(), PTTWebRTCManager.Callback {
 
@@ -40,6 +41,9 @@ class PTTCallService : BaseCallService(), PTTWebRTCManager.Callback {
 
     val messageObservable: Observable<String>
         get() = webRTCManager.messageObservable
+
+    val audioRecordObservable: Observable<File>
+        get() = webRTCManager.audioRecordObservable
 
     override fun onCreate() {
         super.onCreate()

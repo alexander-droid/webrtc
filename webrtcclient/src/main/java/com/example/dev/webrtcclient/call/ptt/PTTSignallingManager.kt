@@ -14,7 +14,6 @@ import com.pusher.client.channel.User
 import org.json.JSONObject
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
-import java.util.*
 
 class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
@@ -51,6 +50,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
             }
 
             override fun onEvent(channelName: String, eventName: String, data: String) {
+                Log.d("fnjrguh", "onEvent 1 $data")
                 try {
                     if (channelName == callInfo.channelName) {
                         when(eventName) {
@@ -108,7 +108,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
     private fun fetchOffer(data: String) {
         val offer = Gson().fromJson(data, MessageOffer::class.java)
-        Log.i(TAG, "OFFER_RECEIVED")
+        Log.i(TAG, "OFFER_RECEIVED ${offer.time}")
         callback.onOffer(offer)
     }
 
@@ -120,7 +120,7 @@ class PTTSignallingManager(var callback: Callback): BaseSignallingManager() {
 
     private fun fetchIce(data: String) {
         val ice = Gson().fromJson(data, MessageIceCandidate::class.java)
-        Log.i(TAG, "ICE_RECEIVED")
+        Log.i(TAG, "ICE_RECEIVED ${ice.time}")
         callback.onIce(ice)
     }
 

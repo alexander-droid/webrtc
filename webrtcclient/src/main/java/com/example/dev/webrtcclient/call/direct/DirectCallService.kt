@@ -189,7 +189,7 @@ class DirectCallService : BaseCallService(), DirectWebRTCManager.Callback {
         } else {
             vibrator.vibrate(1000)
         }
-//        callVibrationHandler.postDelayed({vibrate()}, 5000)
+        callVibrationHandler.postDelayed({vibrate()}, 4000)
     }
 
     private fun startIncomingCallSound() {

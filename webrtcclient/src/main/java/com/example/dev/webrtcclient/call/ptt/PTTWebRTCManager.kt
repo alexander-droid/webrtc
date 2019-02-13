@@ -121,6 +121,7 @@ class PTTWebRTCManager(
 
         val audioDevice = JavaAudioDeviceModule.builder(context)
             .setSamplesReadyCallback(saveRecordedAudioToFile)
+            .setSampleRate(48000)
             .setUseHardwareAcousticEchoCanceler(true)
             .setUseHardwareNoiseSuppressor(true)
             .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
@@ -234,9 +235,9 @@ class PTTWebRTCManager(
                         callInfo?:return@post
                         signalingManager.emitStopTalking(callInfo.me)
                         saveRecordedAudioToFile?.stop()
-                        saveRecordedAudioToFile?.outputFile?.also { file ->
-                            audioRecordSubject.onNext(file)
-                        }
+//                        saveRecordedAudioToFile?.outputFile?.also { file ->
+//                            audioRecordSubject.onNext(file)
+//                        }
                         saveRecordedAudioToFile?.clean()
                         releasePeers(callInfo.me)
                     }

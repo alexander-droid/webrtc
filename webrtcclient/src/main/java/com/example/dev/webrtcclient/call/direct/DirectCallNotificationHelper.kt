@@ -73,6 +73,7 @@ class DirectCallNotificationHelper(private val context: Context) {
                 .setContentIntent(getPendingContentIntent(callType))
                 .setAutoCancel(false)
                 .setOngoing(true)
+                .setVibrate(longArrayOf())
                 .setShowWhen(false)
 //                .setVibrate(longArrayOf(1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000))
                 .setColor(Color.parseColor("#ff2ca5e0"))
@@ -159,8 +160,8 @@ class DirectCallNotificationHelper(private val context: Context) {
             val descriptionText = context.getString(R.string.channel_description_incoming_call)
             val importance = NotificationManager.IMPORTANCE_HIGH
             val mChannel = NotificationChannel(DirectCallService.CHANNEL_ID_INCOMING_CALL, name, importance)
-            mChannel.enableVibration(true)
-            mChannel.vibrationPattern = longArrayOf(1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000)
+            mChannel.enableVibration(false)
+//            mChannel.vibrationPattern = longArrayOf(1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000)
             mChannel.enableLights(true)
             mChannel.lightColor = ContextCompat.getColor(context, R.color.red)
             mChannel.description = descriptionText

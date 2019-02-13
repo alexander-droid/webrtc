@@ -12,16 +12,17 @@ import android.media.AudioFormat.ENCODING_PCM_16BIT
 import android.media.AudioFormat.CHANNEL_CONFIGURATION_MONO
 import android.R
 import android.media.*
-import java.io.File
-import java.io.IOException
 import android.media.AudioFormat.ENCODING_PCM_8BIT
 import android.media.AudioFormat.CHANNEL_CONFIGURATION_MONO
 import android.media.AudioTrack.MODE_STREAM
 import android.media.AudioFormat.ENCODING_PCM_8BIT
 import android.media.AudioFormat.CHANNEL_CONFIGURATION_MONO
 import android.media.AudioManager
-import java.io.FileInputStream
-import java.io.FileNotFoundException
+import java.nio.ByteOrder.LITTLE_ENDIAN
+import android.R.attr.order
+import java.io.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 
 data class AudioPlaybackMessageItem(
@@ -110,63 +111,113 @@ class AudioPlaybackManager(private val context: Context) : MediaPlayer.OnPrepare
     private fun prepare(audioItem: AudioMessageItem) {
         Log.d(TAG, "prepare ${audioItem.audioUrl}")
 
-        Thread {
-            playShortAudioFileViaAudioTrack(audioItem.audioUrl)
-        }.start()
-
-//        isPreparing = true
-//        audioTimerDisposable?.dispose()
-//        mediaPlayer?.release()
-//        mediaPlayer = MediaPlayer().apply {
-//            setAudioAttributes(AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-//            setDataSource(audioItem.audioUrl)
-//            setOnPreparedListener(this@AudioPlaybackManager)
-//            setOnCompletionListener(this@AudioPlaybackManager)
-//        }
-//
-//        mediaPlayer?.prepareAsync()
-    }
-
-    private fun playShortAudioFileViaAudioTrack(filePath: String?) {
-        // We keep temporarily filePath globally as we have only two sample sounds now..
-        if (filePath == null)
-            return
-
-        //Reading the file..
-        var byteData: ByteArray? = null
-        var file: File? = null
-        file = File(filePath) // for ex. path= "/sdcard/samplesound.pcm" or "/sdcard/samplesound.wav"
-        byteData = ByteArray(file.length().toInt())
-        var `in`: FileInputStream? = null
-        try {
-            `in` = FileInputStream(file)
-            `in`!!.read(byteData)
-            `in`!!.close()
-
-        } catch (e: FileNotFoundException) {
-            // TODO Auto-generated catch block
-            e.printStackTrace()
+        isPreparing = true
+        audioTimerDisposable?.dispose()
+        mediaPlayer?.release()
+        mediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+            setDataSource(audioItem.audioUrl)
+            setOnPreparedListener(this@AudioPlaybackManager)
+            setOnCompletionListener(this@AudioPlaybackManager)
         }
 
-        // Set and push to audio track..
-        val intSize = android.media.AudioTrack.getMinBufferSize(
-            8000, AudioFormat.CHANNEL_CONFIGURATION_MONO,
-            AudioFormat.ENCODING_PCM_8BIT
-        )
-        val at = AudioTrack(
-            AudioManager.STREAM_MUSIC, 8000, AudioFormat.CHANNEL_CONFIGURATION_MONO,
-            AudioFormat.ENCODING_PCM_8BIT, intSize, AudioTrack.MODE_STREAM
-        )
-        if (at != null) {
-            at.play()
-            // Write the byte array to the track
-            at.write(byteData, 0, byteData.size)
-            at.stop()
-            at.release()
-        } else
-            Log.d("TCAudio", "audio track is not initialised ")
-
+        mediaPlayer?.prepareAsync()
     }
+
+    /*@Throws(IOException::class)
+    private fun rawToWave(rawFile: File, waveFile: File) {
+
+        val rawData = ByteArray(rawFile.length().toInt())
+        var input: DataInputStream? = null
+        try {
+            input = DataInputStream(FileInputStream(rawFile))
+            input!!.read(rawData)
+        } finally {
+            if (input != null) {
+                input!!.close()
+            }
+        }
+
+        var output: DataOutputStream? = null
+        try {
+            output = DataOutputStream(FileOutputStream(waveFile))
+            // WAVE header
+            // see http://ccrma.stanford.edu/courses/422/projects/WaveFormat/
+            writeString(output, "RIFF") // chunk id
+            writeInt(output!!, 36 + rawData.size) // chunk size
+            writeString(output, "WAVE") // format
+            writeString(output, "fmt ") // subchunk 1 id
+            writeInt(output!!, 16) // subchunk 1 size
+            writeShort(output!!, 1) // audio format (1 = PCM)
+            writeShort(output!!, 1) // number of channels
+            writeInt(output!!, 44100) // sample rate
+            writeInt(output!!, 44100 * 2) // byte rate
+            writeShort(output!!, 2) // block align
+            writeShort(output!!, 16) // bits per sample
+            writeString(output, "data") // subchunk 2 id
+            writeInt(output!!, rawData.size) // subchunk 2 size
+            // Audio data (conversion big endian -> little endian)
+            val shorts = ShortArray(rawData.size / 2)
+            ByteBuffer.wrap(rawData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts)
+            val bytes = ByteBuffer.allocate(shorts.size * 2)
+            for (s in shorts) {
+                bytes.putShort(s)
+            }
+
+            output!!.write(fullyReadFileToBytes(rawFile))
+        } finally {
+            if (output != null) {
+                output!!.close()
+            }
+        }
+    }
+
+    @Throws(IOException::class)
+    fun fullyReadFileToBytes(f: File): ByteArray {
+        val size = f.length().toInt()
+        val bytes = ByteArray(size)
+        val tmpBuff = ByteArray(size)
+        val fis = FileInputStream(f)
+        try {
+
+            var read = fis.read(bytes, 0, size)
+            if (read < size) {
+                var remain = size - read
+                while (remain > 0) {
+                    read = fis.read(tmpBuff, 0, remain)
+                    System.arraycopy(tmpBuff, 0, bytes, size - remain, read)
+                    remain -= read
+                }
+            }
+        } catch (e: IOException) {
+            throw e
+        } finally {
+            fis.close()
+        }
+
+        return bytes
+    }
+
+    @Throws(IOException::class)
+    private fun writeInt(output: DataOutputStream, value: Int) {
+        output.write(value shr 0)
+        output.write(value shr 8)
+        output.write(value shr 16)
+        output.write(value shr 24)
+    }
+
+    @Throws(IOException::class)
+    private fun writeShort(output: DataOutputStream, value: Int) {
+        output.write(value shr 0)
+        output.write(value shr 8)
+    }
+
+    @Throws(IOException::class)
+    private fun writeString(output: DataOutputStream, value: String) {
+        for (i in 0 until value.length) {
+            output.write(value[i].toInt())
+        }
+    }*/
 
     override fun onPrepared(player: MediaPlayer) {
         isPreparing = false
